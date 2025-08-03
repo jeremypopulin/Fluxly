@@ -15,10 +15,6 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 
-import DebugUser from '@/components/DebugUser';
-
-<DebugUser />
-
 
 const queryClient = new QueryClient();
 
