@@ -100,8 +100,9 @@ const TechnicianColumn: React.FC<TechnicianColumnProps> = ({
             <JobCard
               key={job.id}
               job={job}
-              technician={technician}
-              onJobClick={onJobClick}
+              technicianName={technician.name} 
+              onClick={onJobClick}
+
             />
           ))
         )}

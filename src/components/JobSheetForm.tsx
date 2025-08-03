@@ -44,11 +44,11 @@ const JobSheetForm: React.FC<JobSheetFormProps> = ({
     setFormState((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleTechnicianToggle = (techId: string) => {
+  const handleTechnicianToggle = (techId: string, checked: boolean) => {
     setFormState((prev) => {
-      const updated = prev.technicianIds.includes(techId)
-        ? prev.technicianIds.filter((id) => id !== techId)
-        : [...prev.technicianIds, techId];
+      const updated = checked
+        ? [...prev.technicianIds, techId]
+        : prev.technicianIds.filter((id) => id !== techId);
       return { ...prev, technicianIds: updated };
     });
   };
@@ -93,12 +93,12 @@ const JobSheetForm: React.FC<JobSheetFormProps> = ({
 
       <div>
         <Label>Assign Technicians</Label>
-        <div className="space-y-1">
+        <div className="space-y-2">
           {technicians.map((tech) => (
             <label key={tech.id} className="flex items-center space-x-2">
               <Checkbox
                 checked={formState.technicianIds.includes(tech.id)}
-                onCheckedChange={() => handleTechnicianToggle(tech.id)}
+                onCheckedChange={(checked) => handleTechnicianToggle(tech.id, checked === true)}
               />
               <span>{tech.name}</span>
             </label>
@@ -108,12 +108,22 @@ const JobSheetForm: React.FC<JobSheetFormProps> = ({
 
       <div>
         <Label>Start Time</Label>
-        <Input type="datetime-local" name="start_time" value={formState.start_time ?? ''} onChange={handleChange} />
+        <Input
+          type="datetime-local"
+          name="start_time"
+          value={formState.start_time ?? ''}
+          onChange={handleChange}
+        />
       </div>
 
       <div>
         <Label>End Time</Label>
-        <Input type="datetime-local" name="end_time" value={formState.end_time ?? ''} onChange={handleChange} />
+        <Input
+          type="datetime-local"
+          name="end_time"
+          value={formState.end_time ?? ''}
+          onChange={handleChange}
+        />
       </div>
 
       <div>
@@ -121,7 +131,12 @@ const JobSheetForm: React.FC<JobSheetFormProps> = ({
         <select
           name="status"
           value={formState.status}
-          onChange={(e) => setFormState((prev) => ({ ...prev, status: e.target.value as Job['status'] }))}
+          onChange={(e) =>
+            setFormState((prev) => ({
+              ...prev,
+              status: e.target.value as Job['status'],
+            }))
+          }
           className="w-full border rounded px-2 py-1"
         >
           <option value="assigned">Assigned</option>
@@ -135,7 +150,12 @@ const JobSheetForm: React.FC<JobSheetFormProps> = ({
         <select
           name="priority"
           value={formState.priority}
-          onChange={(e) => setFormState((prev) => ({ ...prev, priority: e.target.value as Job['priority'] }))}
+          onChange={(e) =>
+            setFormState((prev) => ({
+              ...prev,
+              priority: e.target.value as Job['priority'],
+            }))
+          }
           className="w-full border rounded px-2 py-1"
         >
           <option value="low">Low</option>

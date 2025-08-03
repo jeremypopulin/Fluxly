@@ -13,16 +13,24 @@ import Logo from './Logo';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { LogOut, Settings, ChevronDown } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
-import { useAuth } from '@/contexts/AuthContext'; // <-- Use the real auth context!
+import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  // ✅ LOG USER INFO TO VERIFY ROLE
+  console.log('👤 user:', user);
+
   const {
     jobs,
     technicians,
@@ -32,7 +40,7 @@ const Dashboard: React.FC = () => {
     deleteJob,
     addCustomer,
     updateCustomer,
-    importCustomers
+    importCustomers,
   } = useAppContext();
 
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
@@ -64,7 +72,11 @@ const Dashboard: React.FC = () => {
       setCurrentView('calendar');
       setIsJobSheetOpen(false);
     } catch {
-      toast({ title: 'Error', description: 'Failed to save job', variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: 'Failed to save job',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -93,7 +105,7 @@ const Dashboard: React.FC = () => {
           <div className="flex items-center space-x-4">
             <Avatar className="w-6 h-6 sm:w-8 sm:h-8">
               <AvatarFallback className="bg-blue-600 text-white text-xs sm:text-sm">
-                {user?.name?.split(' ').map(n => n[0]).join('')}
+                {user?.name?.split(' ').map((n) => n[0]).join('')}
               </AvatarFallback>
             </Avatar>
             <div className="hidden sm:block">
