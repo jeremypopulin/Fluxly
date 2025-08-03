@@ -25,24 +25,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   const fetchUserProfile = async (supabaseUser: any) => {
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("role, name, initials")
-      .eq("id", supabaseUser.id)
-      .single();
+    try {
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("role, name, initials")
+        .eq("id", supabaseUser.id)
+        .single();
 
-    if (error) {
-      console.error("Error fetching profile:", error.message);
+      if (error || !profile) {
+        console.error("❌ Failed to load profile:", error?.message);
+        return {
+          ...supabaseUser,
+          email: supabaseUser.email,
+          role: null,
+          name: '',
+          initials: '',
+        };
+      }
+
+      return {
+        ...supabaseUser,
+        email: supabaseUser.email ?? "",
+        role: profile.role ?? null,
+        name: profile.name ?? "",
+        initials: profile.initials ?? "",
+      };
+    } catch (err) {
+      console.error("💥 Unexpected error in fetchUserProfile:", err);
+      return {
+        ...supabaseUser,
+        email: supabaseUser.email,
+        role: null,
+        name: '',
+        initials: '',
+      };
     }
-
-    return {
-      id: supabaseUser.id,
-      email: supabaseUser.email ?? "",
-      role: profile?.role ?? null,
-      name: profile?.name ?? "",
-      initials: profile?.initials ?? "",
-      ...supabaseUser,
-    };
   };
 
   useEffect(() => {
@@ -55,6 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(null);
         } else if (data?.session?.user) {
           const enrichedUser = await fetchUserProfile(data.session.user);
+          console.log("👤 user:", enrichedUser); // ✅ Debug
           setUser(enrichedUser);
         } else {
           setUser(null);
@@ -74,6 +92,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const supabaseUser = session?.user;
         if (supabaseUser) {
           const enrichedUser = await fetchUserProfile(supabaseUser);
+          console.log("👤 user (onAuthChange):", enrichedUser); // ✅ Debug
           setUser(enrichedUser);
         } else {
           setUser(null);
@@ -98,6 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     const supabaseUser = data.session.user;
     const enrichedUser = await fetchUserProfile(supabaseUser);
+    console.log("👤 user (after login):", enrichedUser); // ✅ Debug
     setUser(enrichedUser);
     return true;
   };
@@ -108,7 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user?.role, login, logout, loading }}>
       {!loading && children}
     </AuthContext.Provider>
   );
