@@ -18,6 +18,10 @@ import { LogOut, Settings, ChevronDown } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/AuthContext'; // <-- Use the real auth context!
 import { useNavigate } from 'react-router-dom';
+import DebugUser from '@/components/DebugUser';
+
+<DebugUser />
+
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
