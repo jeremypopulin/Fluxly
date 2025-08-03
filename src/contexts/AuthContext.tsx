@@ -5,6 +5,8 @@ type User = {
   id: string;
   email: string;
   role?: string;
+  name?: string;
+  initials?: string;
   [key: string]: any;
 };
 
@@ -25,7 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchUserProfile = async (supabaseUser: any) => {
     const { data: profile, error } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, name, initials")
       .eq("id", supabaseUser.id)
       .single();
 
@@ -37,55 +39,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: supabaseUser.id,
       email: supabaseUser.email ?? "",
       role: profile?.role ?? null,
+      name: profile?.name ?? "",
+      initials: profile?.initials ?? "",
       ...supabaseUser,
     };
   };
 
   useEffect(() => {
-  const loadUser = async () => {
-    try {
-      const { data, error } = await supabase.auth.getSession();
+    const loadUser = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
 
-      if (error) {
-        console.error("❌ getSession error:", error.message);
+        if (error) {
+          console.error("❌ getSession error:", error.message);
+          setUser(null);
+        } else if (data?.session?.user) {
+          const enrichedUser = await fetchUserProfile(data.session.user);
+          setUser(enrichedUser);
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.error("💥 Unexpected getSession error:", err);
         setUser(null);
-      } else if (data?.session?.user) {
-        const enrichedUser = await fetchUserProfile(data.session.user);
-        setUser(enrichedUser);
-      } else {
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUser();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      try {
+        const supabaseUser = session?.user;
+        if (supabaseUser) {
+          const enrichedUser = await fetchUserProfile(supabaseUser);
+          setUser(enrichedUser);
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.error("💥 Error in onAuthStateChange:", err);
         setUser(null);
       }
-    } catch (err) {
-      console.error("💥 Unexpected getSession error:", err);
-      setUser(null);
-    } finally {
       setLoading(false);
-    }
-  };
+    });
 
-  loadUser();
-
-  const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-    try {
-      const supabaseUser = session?.user;
-      if (supabaseUser) {
-        const enrichedUser = await fetchUserProfile(supabaseUser);
-        setUser(enrichedUser);
-      } else {
-        setUser(null);
-      }
-    } catch (err) {
-      console.error("💥 Error in onAuthStateChange:", err);
-      setUser(null);
-    }
-    setLoading(false);
-  });
-
-  return () => {
-    listener?.subscription.unsubscribe();
-  };
-}, []);
-
+    return () => {
+      listener?.subscription.unsubscribe();
+    };
+  }, []);
 
   const login = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
