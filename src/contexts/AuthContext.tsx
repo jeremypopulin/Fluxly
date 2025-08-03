@@ -42,53 +42,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    let timeout = setTimeout(() => {
-      console.warn("⚠️ Timeout fallback hit — unblocking UI");
-      setLoading(false);
-    }, 5000); // fallback in case Supabase hangs
+  const loadUser = async () => {
+    try {
+      const { data, error } = await supabase.auth.getSession();
 
-    supabase.auth.getSession().then(async ({ data, error }) => {
-      try {
-        if (error) {
-          console.error("Error getting session:", error.message);
-        }
-
-        const supabaseUser = data?.session?.user;
-        if (supabaseUser) {
-          const enrichedUser = await fetchUserProfile(supabaseUser);
-          setUser(enrichedUser);
-        } else {
-          setUser(null);
-        }
-      } catch (err) {
-        console.error("Unexpected error in getSession:", err);
+      if (error) {
+        console.error("❌ getSession error:", error.message);
+        setUser(null);
+      } else if (data?.session?.user) {
+        const enrichedUser = await fetchUserProfile(data.session.user);
+        setUser(enrichedUser);
+      } else {
         setUser(null);
       }
+    } catch (err) {
+      console.error("💥 Unexpected getSession error:", err);
+      setUser(null);
+    } finally {
       setLoading(false);
-      clearTimeout(timeout);
-    });
+    }
+  };
 
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      try {
-        const supabaseUser = session?.user;
-        if (supabaseUser) {
-          const enrichedUser = await fetchUserProfile(supabaseUser);
-          setUser(enrichedUser);
-        } else {
-          setUser(null);
-        }
-      } catch (err) {
-        console.error("Unexpected error in onAuthStateChange:", err);
+  loadUser();
+
+  const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    try {
+      const supabaseUser = session?.user;
+      if (supabaseUser) {
+        const enrichedUser = await fetchUserProfile(supabaseUser);
+        setUser(enrichedUser);
+      } else {
         setUser(null);
       }
-      setLoading(false);
-    });
+    } catch (err) {
+      console.error("💥 Error in onAuthStateChange:", err);
+      setUser(null);
+    }
+    setLoading(false);
+  });
 
-    return () => {
-      listener?.subscription.unsubscribe();
-      clearTimeout(timeout);
-    };
-  }, []);
+  return () => {
+    listener?.subscription.unsubscribe();
+  };
+}, []);
+
 
   const login = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
