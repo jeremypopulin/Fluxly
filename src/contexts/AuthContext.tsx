@@ -72,7 +72,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(null);
         } else if (data?.session?.user) {
           const enrichedUser = await fetchUserProfile(data.session.user);
-          console.log("👤 user:", enrichedUser); // ✅ Debug
           setUser(enrichedUser);
         } else {
           setUser(null);
@@ -92,7 +91,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const supabaseUser = session?.user;
         if (supabaseUser) {
           const enrichedUser = await fetchUserProfile(supabaseUser);
-          console.log("👤 user (onAuthChange):", enrichedUser); // ✅ Debug
           setUser(enrichedUser);
         } else {
           setUser(null);
@@ -117,7 +115,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     const supabaseUser = data.session.user;
     const enrichedUser = await fetchUserProfile(supabaseUser);
-    console.log("👤 user (after login):", enrichedUser); // ✅ Debug
     setUser(enrichedUser);
     return true;
   };
