@@ -11,8 +11,6 @@ import { TechnicianEditModal } from './TechnicianEditModal';
 import { PasswordResetModal } from './PasswordResetModal';
 import { useAuth } from '@/contexts/AuthContext';
 
-
-
 export const TechnicianManagement: React.FC = () => {
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -27,7 +25,7 @@ export const TechnicianManagement: React.FC = () => {
   const loadTechnicians = async () => {
     try {
       setLoading(true);
-      
+
       if (!isAuthenticated) {
         setTechnicians([]);
         return;
@@ -39,29 +37,29 @@ export const TechnicianManagement: React.FC = () => {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('load-technicians', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
+      const response = await fetch(
+        "https://diyuewnatraebokzeatl.supabase.co/functions/v1/load-technicians",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
         }
-      });
-      
-      if (error) {
-        console.error('Function error loading technicians:', error);
-        toast({ 
-          title: 'Error', 
-          description: 'Failed to load technicians', 
-          variant: 'destructive'
-        });
-        return;
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch technicians");
       }
-      
+
+      const data = await response.json();
       setTechnicians(data?.technicians || []);
+
     } catch (error: any) {
-      console.error('Failed to load technicians:', error);
-      toast({ 
-        title: 'Error', 
-        description: 'Failed to load technicians', 
-        variant: 'destructive'
+      console.error("Failed to load technicians:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load technicians",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
