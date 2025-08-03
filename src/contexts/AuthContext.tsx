@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { supabase } from '@/lib/supabase';
+import { supabase } from "@/lib/supabase";
 
 type User = {
   id: string;
@@ -38,8 +38,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ...supabaseUser,
           email: supabaseUser.email,
           role: null,
-          name: '',
-          initials: '',
+          name: "",
+          initials: "",
         };
       }
 
@@ -56,8 +56,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ...supabaseUser,
         email: supabaseUser.email,
         role: null,
-        name: '',
-        initials: '',
+        name: "",
+        initials: "",
       };
     }
   };
@@ -67,17 +67,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const { data, error } = await supabase.auth.getSession();
 
-        if (error) {
-          console.error("❌ getSession error:", error.message);
+        if (error || !data?.session) {
+          console.warn("Session invalid or expired. Signing out.");
+          await supabase.auth.signOut(); // clear localStorage
           setUser(null);
-        } else if (data?.session?.user) {
+        } else {
           const enrichedUser = await fetchUserProfile(data.session.user);
           setUser(enrichedUser);
-        } else {
-          setUser(null);
         }
       } catch (err) {
         console.error("💥 Unexpected getSession error:", err);
+        await supabase.auth.signOut();
         setUser(null);
       } finally {
         setLoading(false);
@@ -113,8 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error("Login error:", error?.message);
       return false;
     }
-    const supabaseUser = data.session.user;
-    const enrichedUser = await fetchUserProfile(supabaseUser);
+    const enrichedUser = await fetchUserProfile(data.session.user);
     setUser(enrichedUser);
     return true;
   };
