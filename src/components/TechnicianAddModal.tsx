@@ -5,6 +5,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabase';
 
 interface TechnicianAddModalProps {
   isOpen: boolean;
@@ -34,27 +35,42 @@ export function TechnicianAddModal({ isOpen, onClose, onTechnicianAdded }: Techn
     setIsLoading(true);
 
     try {
+      const {
+        data: { session },
+        error: sessionError
+      } = await supabase.auth.getSession();
+
+      if (!session || sessionError) {
+        toast({
+          title: 'Error',
+          description: 'You must be logged in to add a technician',
+          variant: 'destructive'
+        });
+        return;
+      }
+
       const res = await fetch("https://diyuewnatraebokzeatl.supabase.co/functions/v1/create-technician", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}` // ✅ required for secure access
         },
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
           full_name: formData.name,
           role: formData.role.toLowerCase(),
-          secret: "JosieBeePopulin2023!"
+          secret: "JosieBeePopulin2023!" // ✅ shared secret for internal auth
         })
       });
 
       const data = await res.json();
 
-      if (!res.ok || data?.error) {
+      if (!res.ok) {
         console.error("Edge function error:", data);
         toast({
           title: "Error",
-          description: data?.error || "Failed to create technician",
+          description: data.error || "Failed to create technician",
           variant: "destructive"
         });
         return;
@@ -126,7 +142,7 @@ export function TechnicianAddModal({ isOpen, onClose, onTechnicianAdded }: Techn
               <Input
                 id="password"
                 type="password"
-                autoComplete="off"
+                autoComplete="new-password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 required
@@ -140,7 +156,7 @@ export function TechnicianAddModal({ isOpen, onClose, onTechnicianAdded }: Techn
             <Label htmlFor="role">Role</Label>
             <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Select role" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="admin">Administrator</SelectItem>
