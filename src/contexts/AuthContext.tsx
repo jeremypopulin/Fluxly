@@ -7,7 +7,6 @@ type User = {
   role?: string;
   name?: string;
   initials?: string;
-  [key: string]: any;
 };
 
 interface AuthContextType {
@@ -26,32 +25,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchUserProfile = async (supabaseUser: any) => {
     try {
-      const { data: profile, error } = await supabase
+      const { data: profile } = await supabase
         .from("profiles")
         .select("role, name, initials")
         .eq("id", supabaseUser.id)
         .single();
 
-      if (error || !profile) {
-        console.warn("⚠️ Profile not found or error:", error?.message);
-        return {
-          ...supabaseUser,
-          email: supabaseUser.email,
-          role: null,
-          name: "",
-          initials: "",
-        };
-      }
-
       return {
         ...supabaseUser,
         email: supabaseUser.email ?? "",
-        role: profile.role ?? null,
-        name: profile.name ?? "",
-        initials: profile.initials ?? "",
+        role: profile?.role ?? null,
+        name: profile?.name ?? "",
+        initials: profile?.initials ?? "",
       };
     } catch (err) {
-      console.error("💥 Error fetching profile:", err);
+      console.warn("⚠️ Profile load failed. Continuing anyway.");
       return {
         ...supabaseUser,
         email: supabaseUser.email,
@@ -65,9 +53,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const validateSession = async () => {
     try {
       const { data, error } = await supabase.auth.getSession();
-
-      if (error || !data?.session) {
-        await supabase.auth.signOut();
+      if (error || !data.session) {
+        await supabase.auth.signOut(); // ⛔ clear broken token
         setUser(null);
         return;
       }
@@ -75,8 +62,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const enrichedUser = await fetchUserProfile(data.session.user);
       setUser(enrichedUser);
     } catch (err) {
-      console.error("💥 Unexpected getSession error:", err);
-      await supabase.auth.signOut();
+      console.error("💥 Session validation failed:", err);
+      await supabase.auth.signOut(); // ⛔ force logout on error
       setUser(null);
     } finally {
       setLoading(false);
@@ -103,11 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (error || !data.session) {
-      console.error("Login error:", error?.message);
-      return false;
-    }
+    if (error || !data.session) return false;
 
     const enrichedUser = await fetchUserProfile(data.session.user);
     setUser(enrichedUser);
