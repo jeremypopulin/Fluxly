@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,15 +23,15 @@ export const TechnicianEditModal: React.FC<TechnicianEditModalProps> = ({
   technician,
   onTechnicianUpdated
 }) => {
-  const [name, setName] = useState(technician?.name || '');
-  const [email, setEmail] = useState(technician?.email || '');
-  const [role, setRole] = useState(technician?.role || 'tech');
-  const [status, setStatus] = useState(technician?.status || 'active');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('tech');
+  const [status, setStatus] = useState('active');
   const [loading, setLoading] = useState(false);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const { toast } = useToast();
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (technician) {
       setName(technician.name || '');
       setEmail(technician.email || '');
@@ -50,8 +50,7 @@ export const TechnicianEditModal: React.FC<TechnicianEditModalProps> = ({
         .from('profiles')
         .update({
           name,
-          email,
-          role,
+          role: role.toLowerCase(),
           status
         })
         .eq('id', technician.id);
@@ -60,7 +59,7 @@ export const TechnicianEditModal: React.FC<TechnicianEditModalProps> = ({
 
       toast({ title: 'Success', description: 'Technician updated successfully' });
       onTechnicianUpdated();
-      onClose();
+      handleClose();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } finally {
@@ -68,9 +67,17 @@ export const TechnicianEditModal: React.FC<TechnicianEditModalProps> = ({
     }
   };
 
+  const handleClose = () => {
+    setName('');
+    setEmail('');
+    setRole('tech');
+    setStatus('active');
+    onClose();
+  };
+
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
+      <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Edit Technician</DialogTitle>
@@ -91,8 +98,7 @@ export const TechnicianEditModal: React.FC<TechnicianEditModalProps> = ({
                 id="email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
+                disabled
               />
             </div>
             <div>
@@ -131,7 +137,7 @@ export const TechnicianEditModal: React.FC<TechnicianEditModalProps> = ({
                 Reset Password
               </Button>
               <div className="flex space-x-2">
-                <Button type="button" variant="outline" onClick={onClose}>
+                <Button type="button" variant="outline" onClick={handleClose}>
                   Cancel
                 </Button>
                 <Button type="submit" disabled={loading}>

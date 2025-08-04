@@ -4,10 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
-
 
 interface TechnicianAddModalProps {
   isOpen: boolean;
@@ -31,76 +28,51 @@ export function TechnicianAddModal({ isOpen, onClose, onTechnicianAdded }: Techn
   });
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const { isAuthenticated } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      if (!isAuthenticated) {
-        toast({ 
-          title: 'Error', 
-          description: 'Authentication required',
-          variant: 'destructive'
+      const res = await fetch("https://diyuewnatraebokzeatl.supabase.co/functions/v1/create-technician", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          full_name: formData.name, // ✅ use correct key
+          role: formData.role.toLowerCase(),
+          secret: "JosieBeePopulin2023!" // ✅ required for backend auth
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error("Edge function error:", data);
+        toast({
+          title: "Error",
+          description: data.error || "Failed to create technician",
+          variant: "destructive"
         });
         return;
       }
 
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError || !session) {
-        console.error('Session error:', sessionError);
-        throw new Error('Authentication required');
-      }
-      
-      const { data, error } = await supabase.functions.invoke('create-technician', {
-        body: {
-          email: formData.email,
-          password: formData.password,
-          name: formData.name,
-          role: formData.role
-        },
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        }
+      toast({
+        title: "Success",
+        description: `Technician ${formData.name} created successfully!`
       });
 
-      if (error) {
-        console.error('Edge function error:', error);
-        throw new Error(error.message || 'Failed to create technician');
-      }
-
-      if (data?.error) {
-        if (data.error === 'Email already exists') {
-          toast({ 
-            title: 'Error', 
-            description: 'A user with this email already exists', 
-            variant: 'destructive' 
-          });
-        } else {
-          toast({ 
-            title: 'Error', 
-            description: data.error, 
-            variant: 'destructive' 
-          });
-        }
-        return;
-      }
-
-      toast({ 
-        title: 'Success', 
-        description: `Technician ${formData.name} created successfully!` 
-      });
       onTechnicianAdded();
       handleClose();
     } catch (error: any) {
-      console.error('Error creating technician:', error);
-      toast({ 
-        title: 'Error', 
-        description: error.message || 'Failed to create technician', 
-        variant: 'destructive' 
+      console.error("Unexpected error:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Unexpected error creating technician",
+        variant: "destructive"
       });
     } finally {
       setIsLoading(false);
@@ -127,7 +99,7 @@ export function TechnicianAddModal({ isOpen, onClose, onTechnicianAdded }: Techn
         <DialogHeader>
           <DialogTitle>Add New Technician</DialogTitle>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="name">Name</Label>
