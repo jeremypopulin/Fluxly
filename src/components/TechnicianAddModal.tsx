@@ -42,19 +42,19 @@ export function TechnicianAddModal({ isOpen, onClose, onTechnicianAdded }: Techn
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
-          full_name: formData.name, // ✅ use correct key
+          full_name: formData.name,
           role: formData.role.toLowerCase(),
-          secret: "JosieBeePopulin2023!" // ✅ required for backend auth
+          secret: "JosieBeePopulin2023!"
         })
       });
 
       const data = await res.json();
 
-      if (!res.ok) {
+      if (!res.ok || data?.error) {
         console.error("Edge function error:", data);
         toast({
           title: "Error",
-          description: data.error || "Failed to create technician",
+          description: data?.error || "Failed to create technician",
           variant: "destructive"
         });
         return;
@@ -126,6 +126,7 @@ export function TechnicianAddModal({ isOpen, onClose, onTechnicianAdded }: Techn
               <Input
                 id="password"
                 type="password"
+                autoComplete="off"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 required
