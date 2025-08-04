@@ -26,8 +26,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchUserProfile = async (supabaseUser: any) => {
     try {
-      if (!supabaseUser?.id) throw new Error("Missing user ID");
-
       const { data: profile, error } = await supabase
         .from("profiles")
         .select("role, name, initials")
@@ -35,10 +33,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (error || !profile) {
-        console.warn("No profile found:", error);
+        console.warn("⚠️ Profile not found or error:", error?.message);
         return {
           ...supabaseUser,
-          email: supabaseUser.email ?? "",
+          email: supabaseUser.email,
           role: null,
           name: "",
           initials: "",
@@ -53,10 +51,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         initials: profile.initials ?? "",
       };
     } catch (err) {
-      console.error("Failed to fetch profile:", err);
+      console.error("💥 Error fetching profile:", err);
       return {
         ...supabaseUser,
-        email: supabaseUser.email ?? "",
+        email: supabaseUser.email,
         role: null,
         name: "",
         initials: "",
@@ -64,25 +62,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const handleSessionLoad = async () => {
+  const validateSession = async () => {
     try {
       const { data, error } = await supabase.auth.getSession();
-      if (error || !data?.session?.user) {
-        console.warn("Invalid or expired session");
-        await supabase.auth.signOut(); // Clean localStorage/session
+
+      if (error || !data?.session) {
+        await supabase.auth.signOut();
         setUser(null);
-      } else {
-        const enrichedUser = await fetchUserProfile(data.session.user);
-        if (!enrichedUser.role) {
-          console.warn("User exists but no role; signing out");
-          await supabase.auth.signOut();
-          setUser(null);
-        } else {
-          setUser(enrichedUser);
-        }
+        return;
       }
+
+      const enrichedUser = await fetchUserProfile(data.session.user);
+      setUser(enrichedUser);
     } catch (err) {
-      console.error("Error loading session:", err);
+      console.error("💥 Unexpected getSession error:", err);
       await supabase.auth.signOut();
       setUser(null);
     } finally {
@@ -91,18 +84,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    handleSessionLoad();
+    validateSession();
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         const enrichedUser = await fetchUserProfile(session.user);
-        if (!enrichedUser.role) {
-          console.warn("Logged in but no role — logging out");
-          await supabase.auth.signOut();
-          setUser(null);
-        } else {
-          setUser(enrichedUser);
-        }
+        setUser(enrichedUser);
       } else {
         setUser(null);
       }
@@ -116,16 +103,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
     if (error || !data.session) {
       console.error("Login error:", error?.message);
       return false;
     }
+
     const enrichedUser = await fetchUserProfile(data.session.user);
-    if (!enrichedUser.role) {
-      console.warn("Login succeeded but no role; signing out");
-      await supabase.auth.signOut();
-      return false;
-    }
     setUser(enrichedUser);
     return true;
   };
@@ -137,13 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <AuthContext.Provider value={{ user, isAuthenticated: !!user?.role, login, logout, loading }}>
-      {loading ? (
-        <div className="flex h-screen w-full items-center justify-center">
-          <p className="text-gray-500">Loading...</p>
-        </div>
-      ) : (
-        children
-      )}
+      {!loading && children}
     </AuthContext.Provider>
   );
 };
