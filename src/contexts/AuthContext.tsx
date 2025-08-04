@@ -26,6 +26,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchUserProfile = async (supabaseUser: any) => {
     try {
+      if (!supabaseUser?.id) throw new Error("Missing user ID");
+
       const { data: profile, error } = await supabase
         .from("profiles")
         .select("role, name, initials")
@@ -33,10 +35,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (error || !profile) {
-        console.error("❌ Failed to load profile:", error?.message);
+        console.warn("No profile found:", error);
         return {
           ...supabaseUser,
-          email: supabaseUser.email,
+          email: supabaseUser.email ?? "",
           role: null,
           name: "",
           initials: "",
@@ -51,10 +53,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         initials: profile.initials ?? "",
       };
     } catch (err) {
-      console.error("💥 Unexpected error in fetchUserProfile:", err);
+      console.error("Failed to fetch profile:", err);
       return {
         ...supabaseUser,
-        email: supabaseUser.email,
+        email: supabaseUser.email ?? "",
         role: null,
         name: "",
         initials: "",
@@ -62,41 +64,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-
-        if (error || !data?.session) {
-          console.warn("Session invalid or expired. Signing out.");
-          await supabase.auth.signOut(); // clear localStorage
+  const handleSessionLoad = async () => {
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error || !data?.session?.user) {
+        console.warn("Invalid or expired session");
+        await supabase.auth.signOut(); // Clean localStorage/session
+        setUser(null);
+      } else {
+        const enrichedUser = await fetchUserProfile(data.session.user);
+        if (!enrichedUser.role) {
+          console.warn("User exists but no role; signing out");
+          await supabase.auth.signOut();
           setUser(null);
         } else {
-          const enrichedUser = await fetchUserProfile(data.session.user);
           setUser(enrichedUser);
         }
-      } catch (err) {
-        console.error("💥 Unexpected getSession error:", err);
-        await supabase.auth.signOut();
-        setUser(null);
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (err) {
+      console.error("Error loading session:", err);
+      await supabase.auth.signOut();
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    loadUser();
+  useEffect(() => {
+    handleSessionLoad();
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      try {
-        const supabaseUser = session?.user;
-        if (supabaseUser) {
-          const enrichedUser = await fetchUserProfile(supabaseUser);
-          setUser(enrichedUser);
-        } else {
+      if (session?.user) {
+        const enrichedUser = await fetchUserProfile(session.user);
+        if (!enrichedUser.role) {
+          console.warn("Logged in but no role — logging out");
+          await supabase.auth.signOut();
           setUser(null);
+        } else {
+          setUser(enrichedUser);
         }
-      } catch (err) {
-        console.error("💥 Error in onAuthStateChange:", err);
+      } else {
         setUser(null);
       }
       setLoading(false);
@@ -114,6 +121,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
     const enrichedUser = await fetchUserProfile(data.session.user);
+    if (!enrichedUser.role) {
+      console.warn("Login succeeded but no role; signing out");
+      await supabase.auth.signOut();
+      return false;
+    }
     setUser(enrichedUser);
     return true;
   };
@@ -125,7 +137,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <AuthContext.Provider value={{ user, isAuthenticated: !!user?.role, login, logout, loading }}>
-      {!loading && children}
+      {loading ? (
+        <div className="flex h-screen w-full items-center justify-center">
+          <p className="text-gray-500">Loading...</p>
+        </div>
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 };

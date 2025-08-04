@@ -8,8 +8,11 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-        <p>Loading...</p>
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="flex flex-col items-center space-y-2">
+          <div className="animate-spin h-6 w-6 rounded-full border-2 border-t-transparent border-gray-500" />
+          <p className="text-gray-500 text-sm">Checking session...</p>
+        </div>
       </div>
     );
   }
