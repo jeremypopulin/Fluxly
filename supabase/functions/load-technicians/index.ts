@@ -1,24 +1,44 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 
 serve(async (req) => {
-  const authHeader = req.headers.get('Authorization') || '';
-  const token = authHeader.replace('Bearer ', '');
+  // CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response('OK', {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+        'Access-Control-Allow-Headers': '*',
+      },
+    });
+  }
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  // Actual logic
+  try {
+    const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = Deno.env.toObject();
 
-  const response = await fetch(`${supabaseUrl}/rest/v1/profiles?select=*`, {
-    headers: {
-      apikey: serviceRoleKey,
-      Authorization: `Bearer ${token}`,
-    },
-  });
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+      method: 'GET',
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    });
 
-  const data = await response.json();
-  const status = response.status;
+    const data = await response.json();
 
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": "application/json" }
-  });
+    return new Response(JSON.stringify(data), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: 'Failed to load technicians' }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  }
 });

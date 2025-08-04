@@ -1,3 +1,8 @@
 {
-  "imports": {}
+  "imports": {},
+  "env": {
+    "SUPABASE_SERVICE_ROLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpeXVld25hdHJhZWJva3plYXRsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzY2MTM2MiwiZXhwIjoyMDY5MjM3MzYyfQ.yhi7-48zBqQCbBoVAJnxmqT7d2SulPy5xTNxgfrkSHc",
+    "SUPABASE_URL": "https://diyuewnatraebokzeatl.supabase.co",
+    "TECH_CREATION_SECRET": "JosieBeePopulin2023!"
+  }
 }

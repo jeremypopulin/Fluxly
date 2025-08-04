@@ -1,64 +1,83 @@
-// supabase/functions/create-technician/index.ts
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+
+function withCorsHeaders(body: string, status = 200) {
+  return new Response(body, {
+    status,
+    headers: {
+      "Access-Control-Allow-Origin": "*", // Replace * with your domain if needed
+      "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Content-Type": "application/json",
+    },
+  });
+}
 
 serve(async (req) => {
-  const { email, password, full_name, role, secret } = await req.json()
-
-  // Check required fields
-  if (!email || !password || !role || !secret) {
-    return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 })
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return withCorsHeaders("ok");
   }
 
-  // Secret check
-  const validSecret = Deno.env.get('TECH_CREATION_SECRET')
-  if (secret !== validSecret) {
-    return new Response(JSON.stringify({ error: 'Unauthorized: Invalid secret' }), { status: 403 })
-  }
+  try {
+    const { email, password, full_name, role, secret } = await req.json();
 
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  const projectUrl = Deno.env.get('SUPABASE_URL')!
+    if (!email || !password || !role || !secret) {
+      return withCorsHeaders(JSON.stringify({ error: 'Missing required fields' }), 400);
+    }
 
-  // Step 1: Create user
-  const authRes = await fetch(`${projectUrl}/auth/v1/admin/users`, {
-    method: 'POST',
-    headers: {
-      apikey: serviceRoleKey,
-      Authorization: `Bearer ${serviceRoleKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ email, password }),
-  })
+    const validSecret = Deno.env.get('TECH_CREATION_SECRET');
+    if (secret !== validSecret) {
+      return withCorsHeaders(JSON.stringify({ error: 'Unauthorized: Invalid secret' }), 403);
+    }
 
-  const authData = await authRes.json()
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const projectUrl = Deno.env.get('SUPABASE_URL')!;
 
-  if (!authRes.ok || !authData.user?.id) {
-    return new Response(JSON.stringify({ error: 'Failed to create user', detail: authData }), { status: 400 })
-  }
-
-  const userId = authData.user.id
-
-  // Step 2: Add to profiles table
-  const profileRes = await fetch(`${projectUrl}/rest/v1/profiles`, {
-    method: 'POST',
-    headers: {
-      apikey: serviceRoleKey,
-      Authorization: `Bearer ${serviceRoleKey}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=minimal',
-    },
-    body: JSON.stringify([
-      {
-        id: userId,
-        email,
-        full_name,
-        role,
+    // Create user
+    const authRes = await fetch(`${projectUrl}/auth/v1/admin/users`, {
+      method: 'POST',
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        'Content-Type': 'application/json',
       },
-    ]),
-  })
+      body: JSON.stringify({ email, password }),
+    });
 
-  if (!profileRes.ok) {
-    return new Response(JSON.stringify({ error: 'Failed to insert into profiles' }), { status: 500 })
+    const authData = await authRes.json();
+
+    if (!authRes.ok || !authData.user?.id) {
+      return withCorsHeaders(JSON.stringify({ error: 'Failed to create user', detail: authData }), 400);
+    }
+
+    const userId = authData.user.id;
+
+    // Insert into profiles table
+    const profileRes = await fetch(`${projectUrl}/rest/v1/profiles`, {
+      method: 'POST',
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify([
+        {
+          id: userId,
+          email,
+          name: full_name,
+          role,
+          initials: full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 3),
+        },
+      ]),
+    });
+
+    if (!profileRes.ok) {
+      return withCorsHeaders(JSON.stringify({ error: 'Failed to insert into profiles' }), 500);
+    }
+
+    return withCorsHeaders(JSON.stringify({ success: true }), 200);
+  } catch (err) {
+    return withCorsHeaders(JSON.stringify({ error: 'Unexpected error', detail: `${err}` }), 500);
   }
-
-  return new Response(JSON.stringify({ success: true }), { status: 200 })
-})
+});

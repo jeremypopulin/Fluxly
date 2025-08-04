@@ -52,7 +52,7 @@ export const TechnicianManagement: React.FC = () => {
       }
 
       const data = await response.json();
-      setTechnicians(data?.technicians || []);
+      setTechnicians(data || []);
 
     } catch (error: any) {
       console.error("Failed to load technicians:", error);
@@ -74,7 +74,7 @@ export const TechnicianManagement: React.FC = () => {
     switch (role) {
       case 'admin': return 'Administrator';
       case 'senior_tech': return 'Senior Technician';
-      case 'tech': return 'Technician';
+      case 'tech':
       case 'technician': return 'Technician';
       default: return role;
     }
