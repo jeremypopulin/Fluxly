@@ -17,7 +17,7 @@ interface ResendConfig {
 export const ResendSettings: React.FC = () => {
   const [config, setConfig] = useState<ResendConfig>({
     apiKey: '',
-    fromEmail: 'alerts@yourdomain.com',
+    fromEmail: '',
     defaultSubject: 'New Job Notification'
   });
 
@@ -35,16 +35,19 @@ export const ResendSettings: React.FC = () => {
         .select('*')
         .limit(1)
         .single();
-      
-      if (data && !error) {
-        setConfig({
-          apiKey: data.api_key || '',
-          fromEmail: data.from_email || 'alerts@yourdomain.com',
-          defaultSubject: data.default_subject || 'New Job Notification'
-        });
+
+      if (error || !data) {
+        console.error('❌ Failed to load Resend settings:', error);
+        return;
       }
-    } catch (error) {
-      console.error('Failed to load Resend settings:', error);
+
+      setConfig({
+        apiKey: data.api_key || '',
+        fromEmail: data.from_email || '',
+        defaultSubject: data.default_subject || 'New Job Notification'
+      });
+    } catch (err) {
+      console.error('❌ Unexpected error loading Resend settings:', err);
     }
   };
 
@@ -53,25 +56,26 @@ export const ResendSettings: React.FC = () => {
     try {
       const { error } = await supabase
         .from('resend_settings')
-        .upsert({
-          api_key: config.apiKey,
-          from_email: config.fromEmail,
-          default_subject: config.defaultSubject
-        }, { onConflict: 'id' });
-      
-      if (error) {
-        throw error;
-      }
-      
+        .upsert(
+          {
+            api_key: config.apiKey,
+            from_email: config.fromEmail,
+            default_subject: config.defaultSubject
+          },
+          { onConflict: 'id' }
+        );
+
+      if (error) throw error;
+
       toast({
-        title: 'Settings Saved',
-        description: 'Resend configuration has been saved successfully.'
+        title: '✅ Settings Saved',
+        description: 'Your Resend settings were saved successfully.'
       });
-    } catch (error) {
-      console.error('Failed to save Resend settings:', error);
+    } catch (err) {
+      console.error('❌ Failed to save Resend settings:', err);
       toast({
-        title: 'Error',
-        description: 'Failed to save Resend settings.',
+        title: 'Error saving settings',
+        description: 'Please check the console or your Supabase connection.',
         variant: 'destructive'
       });
     } finally {
@@ -82,27 +86,25 @@ export const ResendSettings: React.FC = () => {
   const handleTest = async () => {
     setTesting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('send-job-notification', {
+      const { error } = await supabase.functions.invoke('send-job-notification', {
         body: {
           to: config.fromEmail,
-          subject: 'Test Email from Resend',
-          html: '<p>This is a test email to verify your Resend configuration.</p>'
+          subject: '📧 Test Email from Resend',
+          html: `<p>This is a test email using your Resend config.</p>`
         }
       });
-      
-      if (error) {
-        throw error;
-      }
-      
+
+      if (error) throw error;
+
       toast({
-        title: 'Test Successful',
-        description: 'Test email sent successfully via Resend!'
+        title: '✅ Test Sent',
+        description: 'Check your inbox for the test email.'
       });
-    } catch (error) {
-      console.error('Resend test failed:', error);
+    } catch (err) {
+      console.error('❌ Test email failed:', err);
       toast({
         title: 'Test Failed',
-        description: 'Failed to send test email via Resend.',
+        description: 'Could not send test email.',
         variant: 'destructive'
       });
     } finally {
@@ -162,7 +164,7 @@ export const ResendSettings: React.FC = () => {
                   <Save className="w-4 h-4 mr-2" />
                   {loading ? 'Saving...' : 'Save Settings'}
                 </Button>
-                
+
                 <Button variant="outline" onClick={handleTest} disabled={testing || !config.apiKey}>
                   <TestTube className="w-4 h-4 mr-2" />
                   {testing ? 'Testing...' : 'Test Email'}
