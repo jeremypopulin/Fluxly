@@ -17,7 +17,7 @@ interface ResendConfig {
 export const ResendSettings: React.FC = () => {
   const [config, setConfig] = useState<ResendConfig>({
     apiKey: '',
-    fromEmail: '',
+    fromEmail: 'alerts@yourdomain.com',
     defaultSubject: 'New Job Notification'
   });
 
@@ -36,18 +36,20 @@ export const ResendSettings: React.FC = () => {
         .limit(1)
         .single();
 
-      if (error || !data) {
-        console.error('❌ Failed to load Resend settings:', error);
+      if (error) {
+        console.error('❌ Error loading settings:', error.message);
         return;
       }
 
-      setConfig({
-        apiKey: data.api_key || '',
-        fromEmail: data.from_email || '',
-        defaultSubject: data.default_subject || 'New Job Notification'
-      });
-    } catch (err) {
-      console.error('❌ Unexpected error loading Resend settings:', err);
+      if (data) {
+        setConfig({
+          apiKey: data.api_key || '',
+          fromEmail: data.from_email || 'alerts@yourdomain.com',
+          defaultSubject: data.default_subject || 'New Job Notification'
+        });
+      }
+    } catch (error) {
+      console.error('❌ Unexpected load error:', error);
     }
   };
 
@@ -58,6 +60,7 @@ export const ResendSettings: React.FC = () => {
         .from('resend_settings')
         .upsert(
           {
+            id: 1, // ✅ Required for onConflict to work
             api_key: config.apiKey,
             from_email: config.fromEmail,
             default_subject: config.defaultSubject
@@ -65,17 +68,20 @@ export const ResendSettings: React.FC = () => {
           { onConflict: 'id' }
         );
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Supabase error:', error);
+        throw error;
+      }
 
       toast({
         title: '✅ Settings Saved',
-        description: 'Your Resend settings were saved successfully.'
+        description: 'Resend configuration saved successfully.'
       });
-    } catch (err) {
-      console.error('❌ Failed to save Resend settings:', err);
+    } catch (error: any) {
+      console.error('❌ Failed to save Resend settings:', error.message || error);
       toast({
-        title: 'Error saving settings',
-        description: 'Please check the console or your Supabase connection.',
+        title: '❌ Save Failed',
+        description: error.message || 'Unexpected error while saving.',
         variant: 'destructive'
       });
     } finally {
@@ -86,25 +92,27 @@ export const ResendSettings: React.FC = () => {
   const handleTest = async () => {
     setTesting(true);
     try {
-      const { error } = await supabase.functions.invoke('send-job-notification', {
+      const { data, error } = await supabase.functions.invoke('send-job-notification', {
         body: {
           to: config.fromEmail,
-          subject: '📧 Test Email from Resend',
-          html: `<p>This is a test email using your Resend config.</p>`
+          subject: 'Test Email from Resend',
+          html: '<p>This is a test email to verify your Resend configuration.</p>'
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       toast({
-        title: '✅ Test Sent',
-        description: 'Check your inbox for the test email.'
+        title: '✅ Test Successful',
+        description: 'Test email sent successfully via Resend!'
       });
-    } catch (err) {
-      console.error('❌ Test email failed:', err);
+    } catch (error: any) {
+      console.error('❌ Resend test failed:', error.message || error);
       toast({
-        title: 'Test Failed',
-        description: 'Could not send test email.',
+        title: '❌ Test Failed',
+        description: error.message || 'Failed to send test email via Resend.',
         variant: 'destructive'
       });
     } finally {
