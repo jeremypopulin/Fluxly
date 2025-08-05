@@ -39,7 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         initials: profile?.initials ?? "",
       };
     } catch (err) {
-      console.warn("⚠️ Profile load failed. Continuing anyway.");
+      console.warn("⚠️ Failed to fetch profile. Using basic user.");
       return {
         ...supabaseUser,
         email: supabaseUser.email,
@@ -54,7 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { data, error } = await supabase.auth.getSession();
       if (error || !data.session) {
-        await supabase.auth.signOut(); // ⛔ clear broken token
+        await supabase.auth.signOut();
         setUser(null);
         return;
       }
@@ -62,8 +62,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const enrichedUser = await fetchUserProfile(data.session.user);
       setUser(enrichedUser);
     } catch (err) {
-      console.error("💥 Session validation failed:", err);
-      await supabase.auth.signOut(); // ⛔ force logout on error
+      console.error("💥 Session validation error:", err);
+      await supabase.auth.signOut();
       setUser(null);
     } finally {
       setLoading(false);
@@ -89,17 +89,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error || !data.session) return false;
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-    const enrichedUser = await fetchUserProfile(data.session.user);
-    setUser(enrichedUser);
-    return true;
+      if (error || !data.session) {
+        console.warn("❌ Login error:", error?.message);
+        return false;
+      }
+
+      const enrichedUser = await fetchUserProfile(data.session.user);
+      setUser(enrichedUser);
+      return true;
+    } catch (err) {
+      console.error("💥 Login failed:", err);
+      return false;
+    }
   };
 
   const logout = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    window.location.href = "/login"; // ✅ optional hard redirect
   };
 
   return (
