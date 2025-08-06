@@ -13,49 +13,64 @@ const TechnicianManagement: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
-    // Load technicians on mount
     loadTechnicians();
   }, []);
 
   const loadTechnicians = async () => {
-    try {
-      const { data, error } = await supabase.from<Technician>('technicians').select('*');
-      if (error) throw error;
-      console.log('Loaded technicians:', data);
-      setTechnicians(data ?? []);
-    } catch (err: any) {
-      console.error('Error loading technicians:', err.message || err);
+    const { data, error } = await supabase.from('profiles').select('*');
+    if (error) {
+      console.error('Error loading technicians:', error);
       toast({
         title: 'Error',
         description: 'Failed to load technicians',
         variant: 'destructive',
       });
+    } else {
+      setTechnicians(data);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this technician?')) return;
+    const confirm = window.confirm('Are you sure you want to delete this technician?');
+    if (!confirm) return;
 
-    try {
-      const { error } = await supabase.from('technicians').delete().eq('id', id);
-      if (error) throw error;
-      toast({ title: 'Deleted', description: 'Technician deleted successfully' });
-      await loadTechnicians();
-    } catch (err: any) {
-      console.error('Error deleting technician:', err.message || err);
+    const { error } = await supabase.from('profiles').delete().eq('id', id);
+
+    if (error) {
+      console.error('Error deleting technician:', error);
       toast({
         title: 'Error',
         description: 'Failed to delete technician',
         variant: 'destructive',
       });
+    } else {
+      setTechnicians((prev) => prev.filter((tech) => tech.id !== id));
+      toast({
+        title: 'Deleted',
+        description: 'Technician deleted successfully',
+      });
     }
+  };
+
+  const handleAdd = () => {
+    setShowAddModal(true);
+  };
+
+  const handleAdded = () => {
+    setShowAddModal(false);
+    loadTechnicians();
+  };
+
+  const handleUpdated = () => {
+    setEditTechnician(null);
+    loadTechnicians();
   };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-semibold">Technicians</h2>
-        <Button onClick={() => setShowAddModal(true)}>Add Technician</Button>
+        <Button onClick={handleAdd}>Add Technician</Button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -64,6 +79,7 @@ const TechnicianManagement: React.FC = () => {
             <div>
               <p className="font-medium">{tech.name}</p>
               <p className="text-sm text-muted-foreground">{tech.email}</p>
+              <p className="text-xs text-gray-500 capitalize">{tech.role}</p>
             </div>
             <div className="flex items-center space-x-2">
               <Button variant="outline" onClick={() => setEditTechnician(tech)}>
@@ -81,10 +97,7 @@ const TechnicianManagement: React.FC = () => {
         <TechnicianAddModal
           isOpen={showAddModal}
           onClose={() => setShowAddModal(false)}
-          onTechnicianAdded={async () => {
-            setShowAddModal(false);
-            await loadTechnicians();
-          }}
+          onTechnicianAdded={handleAdded}
         />
       )}
 
@@ -93,10 +106,7 @@ const TechnicianManagement: React.FC = () => {
           isOpen={!!editTechnician}
           technician={editTechnician}
           onClose={() => setEditTechnician(null)}
-          onTechnicianUpdated={async () => {
-            setEditTechnician(null);
-            await loadTechnicians();
-          }}
+          onTechnicianUpdated={handleUpdated}
         />
       )}
     </div>
