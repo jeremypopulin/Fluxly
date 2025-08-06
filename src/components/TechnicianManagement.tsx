@@ -13,51 +13,42 @@ const TechnicianManagement: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
+    // Load technicians on mount
     loadTechnicians();
   }, []);
 
   const loadTechnicians = async () => {
-    const { data, error } = await supabase.from('technicians').select('*');
-    if (error) {
-      console.error('Error loading technicians:', error);
+    try {
+      const { data, error } = await supabase.from<Technician>('technicians').select('*');
+      if (error) throw error;
+      console.log('Loaded technicians:', data);
+      setTechnicians(data ?? []);
+    } catch (err: any) {
+      console.error('Error loading technicians:', err.message || err);
       toast({
         title: 'Error',
         description: 'Failed to load technicians',
         variant: 'destructive',
       });
-    } else {
-      setTechnicians(data);
     }
   };
 
   const handleDelete = async (id: string) => {
-    const confirm = window.confirm('Are you sure you want to delete this technician?');
-    if (!confirm) return;
+    if (!window.confirm('Are you sure you want to delete this technician?')) return;
 
-    const { error } = await supabase.from('technicians').delete().eq('id', id);
-
-    if (error) {
-      console.error('Error deleting technician:', error);
+    try {
+      const { error } = await supabase.from('technicians').delete().eq('id', id);
+      if (error) throw error;
+      toast({ title: 'Deleted', description: 'Technician deleted successfully' });
+      await loadTechnicians();
+    } catch (err: any) {
+      console.error('Error deleting technician:', err.message || err);
       toast({
         title: 'Error',
         description: 'Failed to delete technician',
         variant: 'destructive',
       });
-    } else {
-      setTechnicians((prev) => prev.filter((tech) => tech.id !== id));
-      toast({
-        title: 'Deleted',
-        description: 'Technician deleted successfully',
-      });
     }
-  };
-
-  const handleAdd = (newTech: Technician) => {
-    setTechnicians((prev) => [...prev, newTech]);
-  };
-
-  const handleUpdate = () => {
-    loadTechnicians();
   };
 
   return (
@@ -90,7 +81,10 @@ const TechnicianManagement: React.FC = () => {
         <TechnicianAddModal
           isOpen={showAddModal}
           onClose={() => setShowAddModal(false)}
-          onTechnicianAdded={loadTechnicians}
+          onTechnicianAdded={async () => {
+            setShowAddModal(false);
+            await loadTechnicians();
+          }}
         />
       )}
 
@@ -99,7 +93,10 @@ const TechnicianManagement: React.FC = () => {
           isOpen={!!editTechnician}
           technician={editTechnician}
           onClose={() => setEditTechnician(null)}
-          onTechnicianUpdated={handleUpdate}
+          onTechnicianUpdated={async () => {
+            setEditTechnician(null);
+            await loadTechnicians();
+          }}
         />
       )}
     </div>
