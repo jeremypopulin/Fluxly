@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Technician } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
 import { TechnicianAddModal } from './TechnicianAddModal';
 import { TechnicianEditModal } from './TechnicianEditModal';
@@ -34,54 +33,67 @@ const TechnicianManagement: React.FC = () => {
     const confirm = window.confirm('Are you sure you want to delete this technician?');
     if (!confirm) return;
 
-    const { error } = await supabase.from('profiles').delete().eq('id', id);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    if (error) {
-      console.error('Error deleting technician:', error);
+    const res = await fetch('https://diyuewnatraebokzeatl.supabase.co/functions/v1/delete-technician', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify({
+        userId: id,
+        secret: 'JosieBeePopulin2023!',
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
       toast({
         title: 'Error',
-        description: 'Failed to delete technician',
+        description: data.error || 'Failed to delete technician',
         variant: 'destructive',
       });
-    } else {
-      setTechnicians((prev) => prev.filter((tech) => tech.id !== id));
-      toast({
-        title: 'Deleted',
-        description: 'Technician deleted successfully',
-      });
+      return;
     }
+
+    toast({
+      title: 'Deleted',
+      description: 'Technician removed from system',
+    });
+
+    setTechnicians((prev) => prev.filter((tech) => tech.id !== id));
   };
 
-  const handleAdd = () => {
-    setShowAddModal(true);
+  const handleAdd = (newTech: Technician) => {
+    setTechnicians((prev) => [...prev, newTech]);
   };
 
-  const handleAdded = () => {
-    setShowAddModal(false);
-    loadTechnicians();
-  };
-
-  const handleUpdated = () => {
-    setEditTechnician(null);
-    loadTechnicians();
+  const handleUpdate = (updatedTech: Technician) => {
+    setTechnicians((prev) =>
+      prev.map((tech) => (tech.id === updatedTech.id ? updatedTech : tech))
+    );
   };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-semibold">Technicians</h2>
-        <Button onClick={handleAdd}>Add Technician</Button>
+        <Button onClick={() => setShowAddModal(true)}>Add Technician</Button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {technicians.map((tech) => (
-          <Card key={tech.id} className="p-4 space-y-2">
+          <div key={tech.id} className="p-4 border rounded shadow">
             <div>
               <p className="font-medium">{tech.name}</p>
               <p className="text-sm text-muted-foreground">{tech.email}</p>
-              <p className="text-xs text-gray-500 capitalize">{tech.role}</p>
+              <p className="text-sm capitalize">{tech.role}</p>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 mt-2">
               <Button variant="outline" onClick={() => setEditTechnician(tech)}>
                 Edit
               </Button>
@@ -89,7 +101,7 @@ const TechnicianManagement: React.FC = () => {
                 Delete
               </Button>
             </div>
-          </Card>
+          </div>
         ))}
       </div>
 
@@ -97,7 +109,7 @@ const TechnicianManagement: React.FC = () => {
         <TechnicianAddModal
           isOpen={showAddModal}
           onClose={() => setShowAddModal(false)}
-          onTechnicianAdded={handleAdded}
+          onTechnicianAdded={loadTechnicians}
         />
       )}
 
@@ -106,7 +118,7 @@ const TechnicianManagement: React.FC = () => {
           isOpen={!!editTechnician}
           technician={editTechnician}
           onClose={() => setEditTechnician(null)}
-          onTechnicianUpdated={handleUpdated}
+          onTechnicianUpdated={loadTechnicians}
         />
       )}
     </div>
