@@ -32,19 +32,22 @@ const JobSheet: React.FC<JobSheetProps> = ({
     description: job?.description || '',
     customerId: job?.customerId || '',
     technicianIds: job?.technicianIds || [],
-    startTime: job ? new Date(job.startTime).toISOString().slice(0, 16) : 
-               selectedDate ? selectedDate.toISOString().slice(0, 16) : '',
-    endTime: job ? new Date(job.endTime).toISOString().slice(0, 16) : '',
+    startTime: job ? new Date(job.start_time).toISOString().slice(0, 16) :
+      selectedDate ? selectedDate.toISOString().slice(0, 16) : '',
+    endTime: job ? new Date(job.end_time).toISOString().slice(0, 16) : '',
     status: job?.status || 'assigned' as const,
     priority: job?.priority || 'medium' as const,
     location: job?.location || '',
     quoteNumber: job?.quoteNumber || '',
-    inviteEmail: '',
     files: [] as File[],
-    purchaseOrder: null as File | null
+    purchaseOrder: null as File | null,
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleFieldChange = (key: string, value: any) => {
+    setFormData(prev => ({ ...prev, [key]: value }));
+  };
 
   const handleTechnicianToggle = (techId: string) => {
     setFormData(prev => ({
@@ -53,10 +56,6 @@ const JobSheet: React.FC<JobSheetProps> = ({
         ? prev.technicianIds.filter(id => id !== techId)
         : [...prev.technicianIds, techId]
     }));
-  };
-
-  const handleFilesChange = (files: File[]) => {
-    setFormData(prev => ({ ...prev, files }));
   };
 
   const uploadFiles = async (jobId: string, files: File[]) => {
@@ -68,11 +67,11 @@ const JobSheet: React.FC<JobSheetProps> = ({
         const { error } = await supabase.storage
           .from('job-files')
           .upload(fileName, file);
-        
+
         if (error) {
           console.error('File upload error:', error);
           toast({
-            title: 'File Upload Warning',
+            title: 'File Upload Error',
             description: `Failed to upload ${file.name}`,
             variant: 'destructive'
           });
@@ -82,11 +81,6 @@ const JobSheet: React.FC<JobSheetProps> = ({
       await Promise.all(uploadPromises);
     } catch (error) {
       console.error('File upload error:', error);
-      toast({
-        title: 'File Upload Warning',
-        description: 'Some files failed to upload',
-        variant: 'destructive'
-      });
     }
   };
 
@@ -96,33 +90,27 @@ const JobSheet: React.FC<JobSheetProps> = ({
       const { error } = await supabase.storage
         .from('job-files')
         .upload(fileName, file);
-      
+
       if (error) {
         console.error('Purchase order upload error:', error);
         toast({
-          title: 'Upload Warning',
+          title: 'Upload Error',
           description: 'Failed to upload purchase order',
           variant: 'destructive'
         });
       }
     } catch (error) {
       console.error('Purchase order upload error:', error);
-      toast({
-        title: 'Upload Warning',
-        description: 'Failed to upload purchase order',
-        variant: 'destructive'
-      });
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     setIsSubmitting(true);
-    
+
     try {
       const endTime = formData.endTime || formData.startTime;
       const jobId = job?.id || uuidv4();
-      
+
       const jobData: Job = {
         id: jobId,
         jobNumber: formData.jobNumber,
@@ -130,26 +118,24 @@ const JobSheet: React.FC<JobSheetProps> = ({
         description: formData.description,
         customerId: formData.customerId,
         technicianIds: formData.technicianIds,
-        startTime: new Date(formData.startTime),
-        endTime: new Date(endTime),
+        start_time: new Date(formData.startTime).toISOString(),
+        end_time: new Date(endTime).toISOString(),
         status: formData.status,
         priority: formData.priority,
         location: formData.location,
-        quoteNumber: formData.quoteNumber
+        quoteNumber: formData.quoteNumber,
       };
-      
+
       await onSave(jobData);
-      
-      // Upload files after job is saved
+
       if (formData.files.length > 0) {
         await uploadFiles(jobId, formData.files);
       }
-      
-      // Upload purchase order if provided
+
       if (formData.purchaseOrder) {
         await uploadPurchaseOrder(jobId, formData.purchaseOrder);
       }
-      
+
     } catch (error) {
       console.error('Failed to save job:', error);
       toast({
@@ -168,19 +154,23 @@ const JobSheet: React.FC<JobSheetProps> = ({
     }
   };
 
+  // Handler for file input changes
+  const handleFilesChange = (files: File[]) => {
+    setFormData(prev => ({ ...prev, files }));
+  };
+
   return (
     <JobSheetForm
       formData={formData}
       setFormData={setFormData}
-      technicians={technicians}
-      customers={customers}
-      handleTechnicianToggle={handleTechnicianToggle}
       handleFilesChange={handleFilesChange}
       handleSubmit={handleSubmit}
+      handleTechnicianToggle={handleTechnicianToggle}
       onCancel={onCancel}
       onDelete={handleDelete}
+      technicians={technicians}
+      customers={customers}
       isSubmitting={isSubmitting}
-      job={job}
     />
   );
 };

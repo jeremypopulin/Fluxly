@@ -28,9 +28,6 @@ const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  // ✅ LOG USER INFO TO VERIFY ROLE
-  console.log('👤 user:', user);
-
   const {
     jobs,
     technicians,
@@ -184,9 +181,8 @@ const Dashboard: React.FC = () => {
                   jobs={jobs}
                   technicians={technicians}
                   customers={customers}
-                  onJobClick={handleJobClick}
-                  onEditJob={handleJobClick}
-                  onDeleteJob={handleDeleteJob}
+                  onSave={handleSaveJob}
+                  onDelete={handleDeleteJob}
                 />
               </TabsContent>
               <TabsContent value="customers" className="p-6 h-full overflow-y-auto">
