@@ -1,241 +1,109 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, UserCheck, Clock, User, Edit, Key, Trash2 } from 'lucide-react';
-import { Technician } from '@/types';
 import { supabase } from '@/lib/supabase';
-import { useToast } from '@/hooks/use-toast';
+import { Technician } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { toast } from '@/components/ui/use-toast';
 import { TechnicianAddModal } from './TechnicianAddModal';
 import { TechnicianEditModal } from './TechnicianEditModal';
-import { PasswordResetModal } from './PasswordResetModal';
-import { useAuth } from '@/contexts/AuthContext';
 
-export const TechnicianManagement: React.FC = () => {
+const TechnicianManagement: React.FC = () => {
   const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [editTechnician, setEditTechnician] = useState<Technician | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [selectedTechnician, setSelectedTechnician] = useState<Technician | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
-  const { user, isAuthenticated } = useAuth();
-
-  const loadTechnicians = async () => {
-    try {
-      setLoading(true);
-
-      if (!isAuthenticated) {
-        setTechnicians([]);
-        return;
-      }
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setTechnicians([]);
-        return;
-      }
-
-      const response = await fetch(
-        "https://diyuewnatraebokzeatl.supabase.co/functions/v1/load-technicians",
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch technicians");
-      }
-
-      const data = await response.json();
-      setTechnicians(data || []);
-
-    } catch (error: any) {
-      console.error("Failed to load technicians:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load technicians",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
     loadTechnicians();
-  }, [isAuthenticated]);
+  }, []);
 
-  const getRoleDisplay = (role: string) => {
-    switch (role) {
-      case 'admin': return 'Administrator';
-      case 'senior_tech': return 'Senior Technician';
-      case 'tech':
-      case 'technician': return 'Technician';
-      default: return role;
+  const loadTechnicians = async () => {
+    const { data, error } = await supabase.from('technicians').select('*');
+    if (error) {
+      console.error('Error loading technicians:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load technicians',
+        variant: 'destructive',
+      });
+    } else {
+      setTechnicians(data);
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'active': return <UserCheck className="w-4 h-4 text-green-500" />;
-      case 'pending': return <Clock className="w-4 h-4 text-yellow-500" />;
-      default: return <User className="w-4 h-4 text-gray-500" />;
-    }
-  };
+  const handleDelete = async (id: string) => {
+    const confirm = window.confirm('Are you sure you want to delete this technician?');
+    if (!confirm) return;
 
-  const handleEditTechnician = (technician: Technician) => {
-    setSelectedTechnician(technician);
-    setShowEditModal(true);
-  };
+    const { error } = await supabase.from('technicians').delete().eq('id', id);
 
-  const handleResetPassword = (technician: Technician) => {
-    setSelectedTechnician(technician);
-    setShowPasswordModal(true);
-  };
-
-  const handleDeleteTechnician = async (technician: Technician) => {
-    if (!window.confirm(`Are you sure you want to delete ${technician.name}? This action cannot be undone.`)) {
-      return;
-    }
-
-    setDeletingId(technician.id);
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', technician.id);
-
-      if (error) throw error;
-
-      setTechnicians(prev => prev.filter(t => t.id !== technician.id));
-      toast({ title: 'Success', description: 'Technician deleted successfully' });
-    } catch (error: any) {
+    if (error) {
       console.error('Error deleting technician:', error);
-      toast({ title: 'Error', description: 'Failed to delete technician', variant: 'destructive' });
-    } finally {
-      setDeletingId(null);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete technician',
+        variant: 'destructive',
+      });
+    } else {
+      setTechnicians((prev) => prev.filter((tech) => tech.id !== id));
+      toast({
+        title: 'Deleted',
+        description: 'Technician deleted successfully',
+      });
     }
   };
 
-  const isAdmin = user?.role === 'admin';
+  const handleAdd = (newTech: Technician) => {
+    setTechnicians((prev) => [...prev, newTech]);
+  };
 
-  if (loading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p>Loading technicians...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleUpdate = () => {
+    loadTechnicians();
+  };
 
   return (
-    <div className="h-full flex flex-col space-y-6">
+    <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Technician Management</h2>
-        <Button onClick={() => setShowAddModal(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add
-        </Button>
+        <h2 className="text-lg font-semibold">Technicians</h2>
+        <Button onClick={() => setShowAddModal(true)}>Add Technician</Button>
       </div>
 
-      <ScrollArea className="flex-1 h-[calc(100vh-300px)]">
-        <div className="grid gap-4 pr-4">
-          {technicians.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">No technicians found</p>
-              <Button 
-                variant="outline" 
-                onClick={loadTechnicians}
-                className="mt-4"
-              >
-                Retry Loading
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {technicians.map((tech) => (
+          <Card key={tech.id} className="p-4 space-y-2">
+            <div>
+              <p className="font-medium">{tech.name}</p>
+              <p className="text-sm text-muted-foreground">{tech.email}</p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" onClick={() => setEditTechnician(tech)}>
+                Edit
+              </Button>
+              <Button variant="destructive" onClick={() => handleDelete(tech.id)}>
+                Delete
               </Button>
             </div>
-          ) : (
-            technicians.map((tech) => (
-              <Card key={tech.id}>
-                <CardContent className="flex items-center justify-between p-4">
-                  <div className="flex items-center space-x-3">
-                    {getStatusIcon(tech.status || 'active')}
-                    <div>
-                      <h3 className="font-semibold">{tech.name}</h3>
-                      <p className="text-sm text-gray-600">{tech.email}</p>
-                      <p className="text-sm text-gray-500">{getRoleDisplay(tech.role)}</p>
-                      {tech.status === 'pending' && (
-                        <p className="text-xs text-yellow-600">Invitation pending</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex space-x-2">
-                    {isAdmin && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleResetPassword(tech)}
-                        >
-                          <Key className="w-4 h-4 mr-2" />
-                          Reset Password
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteTechnician(tech)}
-                          disabled={deletingId === tech.id}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          {deletingId === tech.id ? 'Deleting...' : 'Delete'}
-                        </Button>
-                      </>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEditTechnician(tech)}
-                    >
-                      <Edit className="w-4 h-4 mr-2" />
-                      Edit
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
-      </ScrollArea>
+          </Card>
+        ))}
+      </div>
 
-      <TechnicianAddModal
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onTechnicianAdded={loadTechnicians}
-      />
+      {showAddModal && (
+        <TechnicianAddModal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          onTechnicianAdded={loadTechnicians}
+        />
+      )}
 
-      <TechnicianEditModal
-        isOpen={showEditModal}
-        onClose={() => {
-          setShowEditModal(false);
-          setSelectedTechnician(null);
-        }}
-        technician={selectedTechnician}
-        onTechnicianUpdated={loadTechnicians}
-      />
-
-      <PasswordResetModal
-        isOpen={showPasswordModal}
-        onClose={() => {
-          setShowPasswordModal(false);
-          setSelectedTechnician(null);
-        }}
-        technician={selectedTechnician}
-      />
+      {editTechnician && (
+        <TechnicianEditModal
+          isOpen={!!editTechnician}
+          technician={editTechnician}
+          onClose={() => setEditTechnician(null)}
+          onTechnicianUpdated={handleUpdate}
+        />
+      )}
     </div>
   );
 };
+
+export default TechnicianManagement;

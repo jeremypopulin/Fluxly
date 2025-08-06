@@ -5,7 +5,7 @@ import CalendarView from './Calendar/CalendarView';
 import JobSheet from './JobSheet';
 import JobsList from './JobsList';
 import { CustomerList } from './CustomerList';
-import { TechnicianManagement } from './TechnicianManagement';
+import TechnicianManagement from './TechnicianManagement';
 import FileUpload from './FileUpload';
 import ResendSettings from './ResendSettings';
 import ChangePasswordModal from './ChangePasswordModal';

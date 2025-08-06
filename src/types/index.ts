@@ -31,6 +31,7 @@ export interface Job {
   priority: 'low' | 'medium' | 'high';
   location?: string;
   quoteNumber?: string;
+  partsUsed?: string;
 }
 
 
