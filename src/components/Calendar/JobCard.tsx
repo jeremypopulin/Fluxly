@@ -107,7 +107,9 @@ const JobCard: React.FC<JobCardProps> = ({
         )}
 
         {!compact && technicianName && (
-          <div className="text-xs text-gray-500">{technicianName}</div>
+          <div className="text-xs text-gray-500 truncate">
+            {technicianName}
+          </div>
         )}
       </div>
 
