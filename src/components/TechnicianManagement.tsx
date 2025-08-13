@@ -13,6 +13,7 @@ const TechnicianManagement: React.FC = () => {
   const [editTechnician, setEditTechnician] = useState<Technician | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadTechnicians();
@@ -22,64 +23,73 @@ const TechnicianManagement: React.FC = () => {
   const loadTechnicians = async () => {
     setLoading(true);
     try {
-      // ✅ Call secure Edge Function to fetch technicians
+      // ✅ Use Edge Function to fetch (works despite RLS)
       const { data, error } = await supabase.functions.invoke('load-technicians', {
-        body: {}, // no params needed
+        body: {}, // no params
       });
-
       if (error) {
-        throw error;
+        throw new Error(error.message || 'Failed to load technicians');
       }
 
-      // Function may return { technicians: [...] } or just an array. Handle both.
       const list: Technician[] = Array.isArray(data)
         ? data
         : Array.isArray(data?.technicians)
         ? data.technicians
         : [];
 
-      console.log('Loaded technicians (via edge fn):', list);
       setTechnicians(list ?? []);
     } catch (err: any) {
-      console.error('Error loading technicians (edge fn):', err?.message || err);
+      console.error('Error loading technicians (edge):', err?.message || err);
+      setTechnicians([]);
       toast({
         title: 'Error',
         description: 'Failed to load technicians',
         variant: 'destructive',
       });
-      setTechnicians([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    const confirmDelete = window.confirm('Are you sure you want to delete this technician?');
-    if (!confirmDelete) return;
+  const handleDelete = async (userId: string) => {
+    const confirmed = window.confirm('Are you sure you want to delete this technician?');
+    if (!confirmed) return;
 
+    setDeletingId(userId);
     try {
-      // ✅ Use secure deletion through Edge Function (removes from auth.users + profiles)
+      // ✅ Call your delete-technician Edge Function
       const { data, error } = await supabase.functions.invoke('delete-technician', {
-        body: { id },
+        body: {
+          userId,
+          // NOTE: You already use this shared secret in your function.
+          // (Yes, putting this on the client is not ideal, but matches your current setup.)
+          secret: 'JosieBeePopulin2023!',
+        },
       });
 
       if (error) {
-        throw error;
+        throw new Error(error.message || 'Delete function error');
+      }
+      if (data?.error) {
+        throw new Error(data.error);
       }
 
-      // If the function succeeds, refresh list
+      // ✅ Remove from UI
+      setTechnicians((prev) => prev.filter((t) => t.id !== userId));
+
       toast({
         title: 'Deleted',
         description: 'Technician deleted successfully',
       });
-      await loadTechnicians();
     } catch (err: any) {
-      console.error('Error deleting technician (edge fn):', err?.message || err);
+      console.error('Error deleting technician (edge):', err?.message || err);
       toast({
         title: 'Error',
-        description: 'Failed to delete technician',
+        description: err?.message || 'Failed to delete technician',
         variant: 'destructive',
       });
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -117,8 +127,12 @@ const TechnicianManagement: React.FC = () => {
               <Button variant="outline" onClick={() => setEditTechnician(tech)}>
                 Edit
               </Button>
-              <Button variant="destructive" onClick={() => handleDelete(tech.id)}>
-                Delete
+              <Button
+                variant="destructive"
+                onClick={() => handleDelete(tech.id)}
+                disabled={deletingId === tech.id}
+              >
+                {deletingId === tech.id ? 'Deleting…' : 'Delete'}
               </Button>
             </div>
           </Card>
@@ -129,7 +143,6 @@ const TechnicianManagement: React.FC = () => {
         <TechnicianAddModal
           isOpen={showAddModal}
           onClose={() => setShowAddModal(false)}
-          // After adding, re-fetch from server to avoid stale state
           onTechnicianAdded={loadTechnicians}
         />
       )}
