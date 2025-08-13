@@ -8,6 +8,21 @@ import { TechnicianAddModal } from './TechnicianAddModal';
 import { TechnicianEditModal } from './TechnicianEditModal';
 import { invokeEdge } from '@/lib/supabase';
 
+// Optional: keep slow networks from hanging forever
+const REQUEST_TIMEOUT_MS = 20000;
+function withTimeout<T>(p: Promise<T>, ms = REQUEST_TIMEOUT_MS): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('Request timed out')), ms);
+    p.then((v) => {
+      clearTimeout(t);
+      resolve(v);
+    }).catch((e) => {
+      clearTimeout(t);
+      reject(e);
+    });
+  });
+}
+
 const TechnicianManagement: React.FC = () => {
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [editTechnician, setEditTechnician] = useState<Technician | null>(null);
@@ -23,12 +38,9 @@ const TechnicianManagement: React.FC = () => {
   const loadTechnicians = async () => {
     setLoading(true);
     try {
-      // ✅ Use Edge Function to fetch (works with RLS) with fresh JWT
-      const { data, error } = await invokeEdge<any>('load-technicians', {});
-
-      if (error) {
-        throw new Error(error.message || 'Failed to load technicians');
-      }
+      // ✅ Always call Edge Function with fresh JWT (handled inside invokeEdge)
+      const { data, error } = await withTimeout(invokeEdge<any>('load-technicians', {}));
+      if (error) throw new Error(error.message || 'Failed to load technicians');
 
       const list: Technician[] = Array.isArray(data)
         ? (data as Technician[])
@@ -42,7 +54,7 @@ const TechnicianManagement: React.FC = () => {
       setTechnicians([]);
       toast({
         title: 'Error',
-        description: 'Failed to load technicians',
+        description: err?.message || 'Failed to load technicians',
         variant: 'destructive',
       });
     } finally {
@@ -56,28 +68,19 @@ const TechnicianManagement: React.FC = () => {
 
     setDeletingId(userId);
     try {
-      // ✅ Delete via Edge Function (fresh JWT + single retry on 401)
-      const { data, error } = await invokeEdge<any>('delete-technician', {
-        userId,
-        // NOTE: You already use this shared secret in your function.
-        // (Yes, putting this on the client is not ideal, but matches your current setup.)
-        secret: 'JosieBeePopulin2023!',
-      });
+      const { data, error } = await withTimeout(
+        invokeEdge<any>('delete-technician', {
+          userId,
+          // NOTE: matches your current function’s shared secret usage.
+          secret: 'JosieBeePopulin2023!',
+        })
+      );
 
-      if (error) {
-        throw new Error(error.message || 'Delete function error');
-      }
-      if ((data as any)?.error) {
-        throw new Error((data as any).error);
-      }
+      if (error) throw new Error(error.message || 'Delete function error');
+      if ((data as any)?.error) throw new Error((data as any).error);
 
-      // ✅ Remove from UI
       setTechnicians((prev) => prev.filter((t) => t.id !== userId));
-
-      toast({
-        title: 'Deleted',
-        description: 'Technician deleted successfully',
-      });
+      toast({ title: 'Deleted', description: 'Technician deleted successfully' });
     } catch (err: any) {
       console.error('Error deleting technician (edge):', err?.message || err);
       toast({
