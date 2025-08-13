@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from '@/components/ui/use-toast';
-import { Job, Technician, Customer } from '@/types';
+import { Job, Technician, Customer, Todo } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
 
@@ -11,6 +11,15 @@ interface AppContextType {
   jobs: Job[];
   technicians: Technician[];
   customers: Customer[];
+
+  // ✅ Todos with due + completed
+  todos: Todo[];
+  loadTodos: () => Promise<void>;
+  addTodo: (payload: { title: string; description?: string; due_at?: string | null }) => Promise<void>;
+  updateTodo: (id: string, payload: { title: string; description?: string; due_at?: string | null }) => Promise<void>;
+  toggleTodoCompleted: (id: string, next: boolean) => Promise<void>;
+  deleteTodo: (id: string) => Promise<void>;
+
   addJob: (job: Job) => void;
   updateJob: (job: Job) => void;
   deleteJob: (jobId: string) => void;
@@ -33,11 +42,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
-  const { isAuthenticated } = useAuth();
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const { isAuthenticated, user } = useAuth();
 
   const toggleSidebar = () => setSidebarOpen(prev => !prev);
   const generateJobNumber = () => `JOB-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
 
+  // -------------------- TECHNICIANS --------------------
   const loadTechnicians = async () => {
     try {
       const { data, error } = await supabase
@@ -61,6 +72,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // -------------------- CUSTOMERS --------------------
   const loadCustomers = async () => {
     try {
       const { data, error } = await supabase
@@ -85,6 +97,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // -------------------- JOBS --------------------
   const loadJobs = async () => {
     try {
       const { data, error } = await supabase
@@ -115,14 +128,110 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // -------------------- TODOS --------------------
+  const loadTodos = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('todos')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setTodos((data ?? []) as Todo[]);
+    } catch (error) {
+      console.error('Error loading todos:', error);
+      toast({ title: 'Error', description: 'Failed to load to-dos', variant: 'destructive' });
+    }
+  };
+
+  const addTodo = async (payload: { title: string; description?: string; due_at?: string | null }) => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('todos')
+        .insert([{ user_id: user.id, title: payload.title, description: payload.description ?? null, due_at: payload.due_at ?? null }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      if (data) setTodos(prev => [data as Todo, ...prev]);
+      toast({ title: 'To-Do Added', description: 'Your task has been saved' });
+    } catch (error) {
+      console.error('Error adding todo:', error);
+      toast({ title: 'Error', description: 'Failed to add to-do', variant: 'destructive' });
+    }
+  };
+
+  const updateTodo = async (id: string, payload: { title: string; description?: string; due_at?: string | null }) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('todos')
+        .update({
+          title: payload.title,
+          description: payload.description ?? null,
+          due_at: payload.due_at ?? null,
+        })
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      setTodos(prev => prev.map(t => (t.id === id ? { ...t, ...payload } : t)));
+      toast({ title: 'To-Do Updated', description: 'Your task has been updated' });
+    } catch (error) {
+      console.error('Error updating todo:', error);
+      toast({ title: 'Error', description: 'Failed to update to-do', variant: 'destructive' });
+    }
+  };
+
+  const toggleTodoCompleted = async (id: string, next: boolean) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('todos')
+        .update({ completed: next })
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      setTodos(prev => prev.map(t => (t.id === id ? { ...t, completed: next } : t)));
+    } catch (error) {
+      console.error('Error toggling completion:', error);
+      toast({ title: 'Error', description: 'Failed to update task status', variant: 'destructive' });
+    }
+  };
+
+  const deleteTodo = async (id: string) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('todos')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      setTodos(prev => prev.filter(t => t.id !== id));
+      toast({ title: 'To-Do Deleted', description: 'Task removed successfully' });
+    } catch (error) {
+      console.error('Error deleting todo:', error);
+      toast({ title: 'Error', description: 'Failed to delete to-do', variant: 'destructive' });
+    }
+  };
+
+  // -------------------- EFFECT --------------------
   useEffect(() => {
     if (isAuthenticated) {
       loadJobs();
       loadTechnicians();
       loadCustomers();
+      loadTodos();
     }
   }, [isAuthenticated]);
 
+  // -------------------- JOBS CRUD --------------------
   const addJob = async (job: Job) => {
     const jobId = job.id || uuidv4();
     const jobWithId = { ...job, id: jobId };
@@ -140,6 +249,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     toast({ title: 'Job Deleted', description: 'Job has been deleted successfully' });
   };
 
+  // -------------------- CUSTOMERS CRUD --------------------
   const addCustomer = async (customerData: Omit<Customer, 'id'>) => {
     try {
       const { data, error } = await supabase.from('customers').insert({
@@ -220,6 +330,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // -------------------- TECHNICIANS CRUD --------------------
   const addTechnician = async (techData: Omit<Technician, 'id'>) => {
     const technician: Technician = { ...techData, id: uuidv4(), status: 'active' };
     setTechnicians(prev => [...prev, technician]);
@@ -239,9 +350,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider value={{
       sidebarOpen, toggleSidebar, jobs, technicians, customers,
-      addJob, updateJob, deleteJob, loadJobs, addCustomer,
-      updateCustomer, importCustomers, addTechnician, updateTechnician,
-      deleteTechnician, generateJobNumber, loadTechnicians
+      todos, loadTodos, addTodo, updateTodo, toggleTodoCompleted, deleteTodo,
+      addJob, updateJob, deleteJob, loadJobs,
+      addCustomer, updateCustomer, importCustomers,
+      addTechnician, updateTechnician, deleteTechnician,
+      generateJobNumber, loadTechnicians
     }}>
       {children}
     </AppContext.Provider>

@@ -54,3 +54,14 @@ export interface InviteData {
   name: string;
   role: 'admin' | 'senior_tech' | 'tech';
 }
+
+export interface Todo {
+  id: string;
+  user_id: string;
+  title: string;
+  description?: string;
+  due_at?: string | null;     // ISO datetime from Supabase
+  completed: boolean;
+  created_at: string;
+}
+
