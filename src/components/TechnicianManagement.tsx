@@ -8,7 +8,11 @@ import { TechnicianAddModal } from './TechnicianAddModal';
 import { TechnicianEditModal } from './TechnicianEditModal';
 import { invokeEdge } from '@/lib/supabase';
 
-// Optional: keep slow networks from hanging forever
+// ---- Build signature (shows in UI + console to prove correct file is loaded)
+const BUILD_TAG = 'TM-guarded-v2 @ 2025-08-14';
+console.log('[TechnicianManagement] build:', BUILD_TAG);
+
+// Optional: prevent infinite “Loading…” if a request hangs
 const REQUEST_TIMEOUT_MS = 20000;
 function withTimeout<T>(p: Promise<T>, ms = REQUEST_TIMEOUT_MS): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -29,6 +33,7 @@ const TechnicianManagement: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [lastError, setLastError] = useState<string | null>(null);
 
   useEffect(() => {
     loadTechnicians();
@@ -37,6 +42,7 @@ const TechnicianManagement: React.FC = () => {
 
   const loadTechnicians = async () => {
     setLoading(true);
+    setLastError(null);
     try {
       // ✅ Always call Edge Function with fresh JWT (handled inside invokeEdge)
       const { data, error } = await withTimeout(invokeEdge<any>('load-technicians', {}));
@@ -49,14 +55,13 @@ const TechnicianManagement: React.FC = () => {
         : [];
 
       setTechnicians(list ?? []);
+      console.log('[TechnicianManagement] loaded technicians:', list.length);
     } catch (err: any) {
-      console.error('Error loading technicians (edge):', err?.message || err);
+      const msg = err?.message || 'Failed to load technicians';
+      console.error('[TechnicianManagement] load error:', msg, err);
       setTechnicians([]);
-      toast({
-        title: 'Error',
-        description: err?.message || 'Failed to load technicians',
-        variant: 'destructive',
-      });
+      setLastError(msg);
+      toast({ title: 'Error', description: msg, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -67,6 +72,7 @@ const TechnicianManagement: React.FC = () => {
     if (!confirmed) return;
 
     setDeletingId(userId);
+    setLastError(null);
     try {
       const { data, error } = await withTimeout(
         invokeEdge<any>('delete-technician', {
@@ -82,12 +88,10 @@ const TechnicianManagement: React.FC = () => {
       setTechnicians((prev) => prev.filter((t) => t.id !== userId));
       toast({ title: 'Deleted', description: 'Technician deleted successfully' });
     } catch (err: any) {
-      console.error('Error deleting technician (edge):', err?.message || err);
-      toast({
-        title: 'Error',
-        description: err?.message || 'Failed to delete technician',
-        variant: 'destructive',
-      });
+      const msg = err?.message || 'Failed to delete technician';
+      console.error('[TechnicianManagement] delete error:', msg, err);
+      setLastError(msg);
+      toast({ title: 'Error', description: msg, variant: 'destructive' });
     } finally {
       setDeletingId(null);
     }
@@ -101,12 +105,29 @@ const TechnicianManagement: React.FC = () => {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-semibold">Technicians</h2>
-        <Button onClick={() => setShowAddModal(true)} disabled={loading}>
-          {loading ? 'Loading…' : 'Add Technician'}
-        </Button>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-muted-foreground" title="Build signature">
+            {BUILD_TAG}
+          </span>
+          <Button onClick={() => setShowAddModal(true)} disabled={loading}>
+            {loading ? 'Loading…' : 'Add Technician'}
+          </Button>
+        </div>
       </div>
 
-      {technicians.length === 0 && !loading && (
+      {lastError && !loading && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+          <div className="font-medium">Couldn’t load technicians</div>
+          <div className="text-muted-foreground">{lastError}</div>
+          <div className="mt-2">
+            <Button variant="outline" onClick={loadTechnicians}>
+              Retry
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {technicians.length === 0 && !loading && !lastError && (
         <p className="text-sm text-muted-foreground">No technicians found.</p>
       )}
 
@@ -116,12 +137,11 @@ const TechnicianManagement: React.FC = () => {
             <div>
               <p className="font-medium">{tech.name || '(no name)'}</p>
               <p className="text-sm text-muted-foreground">{tech.email}</p>
-              <p className="text-xs mt-1">
-                Role: <span className="font-medium">{tech.role}</span>
-                {tech.status ? (
-                  <span className="ml-2 text-muted-foreground">({tech.status})</span>
-                ) : null}
-              </p>
+              {tech.role && (
+                <p className="text-xs mt-1">
+                  Role: <span className="font-medium">{tech.role}</span>
+                </p>
+              )}
             </div>
             <div className="flex items-center space-x-2">
               <Button variant="outline" onClick={() => setEditTechnician(tech)}>
