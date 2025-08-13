@@ -1,7 +1,7 @@
 // src/lib/supabase.ts
 import { createClient, Session, SupabaseClient } from '@supabase/supabase-js';
 
-// --- Your current project values (kept as-is) ---
+// --- Project values (same as you had) ---
 const supabaseUrl = 'https://diyuewnatraebokzeatl.supabase.co';
 const supabaseAnonKey =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpeXVld25hdHJhZWJva3plYXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM2NjEzNjIsImV4cCI6MjA2OTIzNzM2Mn0.xvAbWWQaVKpOfmMVvJEqjUaMgxG6t82BGUpVwe8r8HE';
