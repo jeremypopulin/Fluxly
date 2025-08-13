@@ -1,6 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
+// ✅ Helper to clear Supabase auth token(s) dynamically
+const clearSupabaseAuthTokens = () => {
+  const keys = Object.keys(localStorage);
+  for (const key of keys) {
+    if (key.startsWith("sb-") && key.includes("auth-token")) {
+      localStorage.removeItem(key);
+    }
+  }
+};
+
 type User = {
   id: string;
   email: string;
@@ -54,6 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { data, error } = await supabase.auth.getSession();
       if (error || !data.session) {
+        clearSupabaseAuthTokens(); // ✅ Clear stale tokens
         await supabase.auth.signOut();
         setUser(null);
         return;
@@ -63,6 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(enrichedUser);
     } catch (err) {
       console.error("💥 Session validation error:", err);
+      clearSupabaseAuthTokens();
       await supabase.auth.signOut();
       setUser(null);
     } finally {
@@ -78,6 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const enrichedUser = await fetchUserProfile(session.user);
         setUser(enrichedUser);
       } else {
+        clearSupabaseAuthTokens(); // ✅ Token cleared when signed out
         setUser(null);
       }
       setLoading(false);
@@ -107,13 +120,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    clearSupabaseAuthTokens(); // ✅ Also clear on manual logout
     await supabase.auth.signOut();
     setUser(null);
-    window.location.href = "/login"; // ✅ optional hard redirect
+    window.location.href = "/login";
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user?.role, login, logout, loading }}>
+    <AuthContext.Provider
+      value={{ user, isAuthenticated: !!user?.role, login, logout, loading }}
+    >
       {!loading && children}
     </AuthContext.Provider>
   );
