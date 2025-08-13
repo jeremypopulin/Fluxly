@@ -6,9 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/
 import { User, Lock } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import Logo from './Logo';
-// Update the import path if the file is located elsewhere, for example:
 import { useAuth } from '@/contexts/AuthContext';
-// Or create the file './context/AuthContext.tsx' if it does not exist.
 
 interface LoginFormProps {
   onLogin: () => void;

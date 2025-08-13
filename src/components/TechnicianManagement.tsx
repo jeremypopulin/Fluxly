@@ -1,136 +1,149 @@
-import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+// src/components/technicians/TechnicianManagement.tsx
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { toast } from '@/components/ui/use-toast';
 import type { Technician } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { toast } from '@/components/ui/use-toast';
+import { TechnicianAddModal } from './TechnicianAddModal';
+import { TechnicianEditModal } from './TechnicianEditModal';
 
-interface TechnicianAddModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  /** After a successful add, trigger a refresh in the parent */
-  onTechnicianAdded: () => void;
-}
-
-export const TechnicianAddModal: React.FC<TechnicianAddModalProps> = ({
-  isOpen,
-  onClose,
-  onTechnicianAdded,
-}) => {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'admin' | 'senior_tech' | 'tech'>('tech');
+const TechnicianManagement: React.FC = () => {
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [editTechnician, setEditTechnician] = useState<Technician | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !name) return;
+  useEffect(() => {
+    loadTechnicians();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  const loadTechnicians = async () => {
     setLoading(true);
     try {
-      // Call secure Edge Function to create + invite technician
-      const { data, error } = await supabase.functions.invoke('create-technician', {
-        body: { name, email, role },
+      // ✅ Call secure Edge Function to fetch technicians
+      const { data, error } = await supabase.functions.invoke('load-technicians', {
+        body: {}, // no params needed
       });
 
       if (error) {
         throw error;
       }
 
-      // Optional: if your function returns a technician record, you can use it.
-      // But we refresh via onTechnicianAdded() to stay consistent.
-      const created: Technician | undefined = data?.technician;
+      // Function may return { technicians: [...] } or just an array. Handle both.
+      const list: Technician[] = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.technicians)
+        ? data.technicians
+        : [];
 
-      toast({
-        title: 'Success',
-        description: 'Technician invited successfully.',
-      });
-
-      // Ask parent to reload the list
-      onTechnicianAdded();
-      onClose();
+      console.log('Loaded technicians (via edge fn):', list);
+      setTechnicians(list ?? []);
     } catch (err: any) {
-      const message =
-        err?.message ||
-        err?.error?.message ||
-        'Failed to invite technician. Check Edge Function logs.';
+      console.error('Error loading technicians (edge fn):', err?.message || err);
       toast({
         title: 'Error',
-        description: message,
+        description: 'Failed to load technicians',
         variant: 'destructive',
       });
+      setTechnicians([]);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleDelete = async (id: string) => {
+    const confirmDelete = window.confirm('Are you sure you want to delete this technician?');
+    if (!confirmDelete) return;
+
+    try {
+      // ✅ Use secure deletion through Edge Function (removes from auth.users + profiles)
+      const { data, error } = await supabase.functions.invoke('delete-technician', {
+        body: { id },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      // If the function succeeds, refresh list
+      toast({
+        title: 'Deleted',
+        description: 'Technician deleted successfully',
+      });
+      await loadTechnicians();
+    } catch (err: any) {
+      console.error('Error deleting technician (edge fn):', err?.message || err);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete technician',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleUpdate = () => {
+    loadTechnicians();
+  };
+
   return (
-    <Dialog
-      open={isOpen}
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-    >
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Add Technician</DialogTitle>
-        </DialogHeader>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-lg font-semibold">Technicians</h2>
+        <Button onClick={() => setShowAddModal(true)} disabled={loading}>
+          {loading ? 'Loading…' : 'Add Technician'}
+        </Button>
+      </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              autoFocus
-            />
-          </div>
+      {technicians.length === 0 && !loading && (
+        <p className="text-sm text-muted-foreground">No technicians found.</p>
+      )}
 
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {technicians.map((tech) => (
+          <Card key={tech.id} className="p-4 space-y-2">
+            <div>
+              <p className="font-medium">{tech.name || '(no name)'}</p>
+              <p className="text-sm text-muted-foreground">{tech.email}</p>
+              <p className="text-xs mt-1">
+                Role: <span className="font-medium">{tech.role}</span>
+                {tech.status ? (
+                  <span className="ml-2 text-muted-foreground">({tech.status})</span>
+                ) : null}
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" onClick={() => setEditTechnician(tech)}>
+                Edit
+              </Button>
+              <Button variant="destructive" onClick={() => handleDelete(tech.id)}>
+                Delete
+              </Button>
+            </div>
+          </Card>
+        ))}
+      </div>
 
-          <div>
-            <Label htmlFor="role">Role</Label>
-            <Select
-              value={role}
-              onValueChange={(val) => setRole(val as Technician['role'])}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="senior_tech">Senior Technician</SelectItem>
-                <SelectItem value="tech">Technician</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+      {showAddModal && (
+        <TechnicianAddModal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          // After adding, re-fetch from server to avoid stale state
+          onTechnicianAdded={loadTechnicians}
+        />
+      )}
 
-          <div className="flex justify-end space-x-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Inviting…' : 'Invite'}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+      {editTechnician && (
+        <TechnicianEditModal
+          isOpen={!!editTechnician}
+          technician={editTechnician}
+          onClose={() => setEditTechnician(null)}
+          onTechnicianUpdated={handleUpdate}
+        />
+      )}
+    </div>
   );
 };
 
-export default TechnicianAddModal;
+export default TechnicianManagement;
