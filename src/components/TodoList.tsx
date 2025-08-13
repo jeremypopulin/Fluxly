@@ -14,6 +14,7 @@ const TodoList: React.FC = () => {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // order: incomplete first -> nearest due date -> newest created
   const sorted = useMemo(() => {
     return [...todos].sort((a, b) => {
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
@@ -82,7 +83,12 @@ const TodoList: React.FC = () => {
             <Input
               type="datetime-local"
               value={form.due_at ?? ''}
-              onChange={(e) => setForm(f => ({ ...f, due_at: e.target.value ? new Date(e.target.value).toISOString() : '' }))}
+              onChange={(e) =>
+                setForm(f => ({
+                  ...f,
+                  due_at: e.target.value ? new Date(e.target.value).toISOString() : ''
+                }))
+              }
               placeholder="Due / required by"
             />
           </div>
@@ -94,7 +100,7 @@ const TodoList: React.FC = () => {
         />
         <div className="flex gap-2">
           <Button onClick={handleSave} className="bg-blue-600 text-white">
-            {editingId ? 'Update To-Do' : 'Add To-Do'}
+            {editingId ? 'Update To‑Do' : 'Add To‑Do'}
           </Button>
           {editingId && (
             <Button variant="secondary" onClick={startAdd}>
@@ -107,7 +113,7 @@ const TodoList: React.FC = () => {
       {/* List */}
       <div className="space-y-2">
         {sorted.length === 0 ? (
-          <p className="text-sm text-gray-500">No to-dos yet.</p>
+          <p className="text-sm text-gray-500">No to‑dos yet.</p>
         ) : (
           sorted.map((todo) => (
             <div
@@ -120,7 +126,9 @@ const TodoList: React.FC = () => {
                   onCheckedChange={(checked) => toggleTodoCompleted(todo.id, !!checked)}
                 />
                 <div>
-                  <p className={`font-semibold ${todo.completed ? 'line-through text-gray-500' : ''}`}>{todo.title}</p>
+                  <p className={`font-semibold ${todo.completed ? 'line-through text-gray-500' : ''}`}>
+                    {todo.title}
+                  </p>
                   {todo.description && (
                     <p className={`text-sm ${todo.completed ? 'line-through text-gray-400' : 'text-gray-600'}`}>
                       {todo.description}

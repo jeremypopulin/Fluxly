@@ -24,6 +24,9 @@ import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
+// ✅ NEW: To‑Do list import (path to your component)
+import TodoList from '@/components/TodoList';
+
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -93,6 +96,8 @@ const Dashboard: React.FC = () => {
   };
 
   const isAdmin = user?.role === 'admin';
+  // ✅ +1 tab for To‑Do (visible to all)
+  const tabCols = isAdmin ? 'grid-cols-7' : 'grid-cols-5';
 
   return (
     <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
@@ -157,9 +162,13 @@ const Dashboard: React.FC = () => {
         ) : (
           <Tabs defaultValue="calendar" className="h-full flex flex-col">
             <div className="px-3 sm:px-6 py-2 flex-shrink-0">
-              <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-6' : 'grid-cols-4'} text-xs sm:text-sm`}>
+              <TabsList className={`grid w-full ${tabCols} text-xs sm:text-sm`}>
                 <TabsTrigger value="calendar">Calendar</TabsTrigger>
                 <TabsTrigger value="jobs">Jobs</TabsTrigger>
+
+                {/* ✅ To‑Do tab placed BETWEEN Jobs and Customers */}
+                <TabsTrigger value="todo">To‑Do</TabsTrigger>
+
                 <TabsTrigger value="customers">Customers</TabsTrigger>
                 <TabsTrigger value="files">Files</TabsTrigger>
                 {isAdmin && <TabsTrigger value="technicians">Technicians</TabsTrigger>}
@@ -176,6 +185,7 @@ const Dashboard: React.FC = () => {
                   onUpdateJob={updateJob}
                 />
               </TabsContent>
+
               <TabsContent value="jobs" className="p-6 h-full overflow-y-auto">
                 <JobsList
                   jobs={jobs}
@@ -185,6 +195,12 @@ const Dashboard: React.FC = () => {
                   onDelete={handleDeleteJob}
                 />
               </TabsContent>
+
+              {/* ✅ To‑Do content */}
+              <TabsContent value="todo" className="p-6 h-full overflow-y-auto">
+                <TodoList />
+              </TabsContent>
+
               <TabsContent value="customers" className="p-6 h-full overflow-y-auto">
                 <CustomerList
                   customers={customers}
@@ -193,9 +209,11 @@ const Dashboard: React.FC = () => {
                   onImportCustomers={importCustomers}
                 />
               </TabsContent>
+
               <TabsContent value="files" className="p-6 h-full overflow-y-auto">
                 <FileUpload onFilesChange={handleFilesUploaded} />
               </TabsContent>
+
               {isAdmin && (
                 <TabsContent value="technicians" className="p-6 h-full overflow-y-auto">
                   <TechnicianManagement />
