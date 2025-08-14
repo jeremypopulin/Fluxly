@@ -6,13 +6,14 @@ import { toast } from '@/components/ui/use-toast';
 import JobSheetForm from './JobSheetForm';
 import { useAppContext } from '@/contexts/AppContext';
 import { v4 as uuidv4 } from 'uuid';
+import { Button } from '@/components/ui/button';
 
 interface JobSheetProps {
   job?: Job;
   selectedDate?: Date;
   technicians: Technician[];
   customers: Customer[];
-  onSave: (job: Job) => void;    // will receive the saved row from Supabase
+  onSave: (job: Job) => void;
   onCancel: () => void;
   onDelete?: (jobId: string) => void;
 }
@@ -27,7 +28,6 @@ const JobSheet: React.FC<JobSheetProps> = ({
   onDelete
 }) => {
   const { generateJobNumber } = useAppContext();
-
   const [formData, setFormData] = useState({
     jobNumber: job?.jobNumber || generateJobNumber(),
     title: job?.title || '',
@@ -40,47 +40,47 @@ const JobSheet: React.FC<JobSheetProps> = ({
       ? selectedDate.toISOString().slice(0, 16)
       : '',
     endTime: job ? new Date(job.end_time).toISOString().slice(0, 16) : '',
-    status: (job?.status as Job['status']) || ('assigned' as const),
-    priority: (job?.priority as Job['priority']) || ('medium' as const),
+    status: (job?.status || 'assigned') as const,
+    priority: (job?.priority || 'medium') as const,
     location: job?.location || '',
     quoteNumber: job?.quoteNumber || '',
     partsUsed: job?.partsUsed || '',
     inviteEmail: '',
     files: [] as File[],
-    purchaseOrder: null as File | null,
+    purchaseOrder: null as File | null
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleTechnicianToggle = (techId: string) => {
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
       technicianIds: prev.technicianIds.includes(techId)
-        ? prev.technicianIds.filter((id) => id !== techId)
-        : [...prev.technicianIds, techId],
+        ? prev.technicianIds.filter(id => id !== techId)
+        : [...prev.technicianIds, techId]
     }));
   };
 
   const handleFilesChange = (files: File[]) => {
-    setFormData((prev) => ({ ...prev, files }));
+    setFormData(prev => ({ ...prev, files }));
   };
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Storage uploads
-  // ─────────────────────────────────────────────────────────────────────────────
   const uploadFiles = async (jobId: string, files: File[]) => {
     if (!files || files.length === 0) return;
 
     try {
       const uploadPromises = files.map(async (file) => {
         const fileName = `${jobId}/${Date.now()}-${file.name}`;
-        const { error } = await supabase.storage.from('job-files').upload(fileName, file);
+        const { error } = await supabase.storage
+          .from('job-files')
+          .upload(fileName, file);
+
         if (error) {
           console.error('File upload error:', error);
           toast({
             title: 'File Upload Warning',
             description: `Failed to upload ${file.name}`,
-            variant: 'destructive',
+            variant: 'destructive'
           });
         }
       });
@@ -91,7 +91,7 @@ const JobSheet: React.FC<JobSheetProps> = ({
       toast({
         title: 'File Upload Warning',
         description: 'Some files failed to upload',
-        variant: 'destructive',
+        variant: 'destructive'
       });
     }
   };
@@ -99,13 +99,16 @@ const JobSheet: React.FC<JobSheetProps> = ({
   const uploadPurchaseOrder = async (jobId: string, file: File) => {
     try {
       const fileName = `${jobId}/purchase-order-${Date.now()}-${file.name}`;
-      const { error } = await supabase.storage.from('job-files').upload(fileName, file);
+      const { error } = await supabase.storage
+        .from('job-files')
+        .upload(fileName, file);
+
       if (error) {
         console.error('Purchase order upload error:', error);
         toast({
           title: 'Upload Warning',
           description: 'Failed to upload purchase order',
-          variant: 'destructive',
+          variant: 'destructive'
         });
       }
     } catch (error) {
@@ -113,55 +116,37 @@ const JobSheet: React.FC<JobSheetProps> = ({
       toast({
         title: 'Upload Warning',
         description: 'Failed to upload purchase order',
-        variant: 'destructive',
+        variant: 'destructive'
       });
     }
   };
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Save to Supabase (persists technicianIds[] as array)
-  // ─────────────────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
-      // Use endTime = startTime if empty
       const endTime = formData.endTime || formData.startTime;
-
-      // Keep your external ID usage for uploads, otherwise DB can also generate UUIDs
       const jobId = job?.id || uuidv4();
 
-      // Build payload for DB
-      const payload: Omit<Job, 'id'> & { id: string } = {
+      const jobData: Job = {
         id: jobId,
         jobNumber: formData.jobNumber,
         title: formData.title,
         description: formData.description,
         customerId: formData.customerId,
-        technicianIds: formData.technicianIds, // ← persist multiple techs
+        technicianIds: formData.technicianIds,
         start_time: new Date(formData.startTime).toISOString(),
         end_time: new Date(endTime).toISOString(),
         status: formData.status,
         priority: formData.priority,
         location: formData.location,
         quoteNumber: formData.quoteNumber,
-        partsUsed: formData.partsUsed || '',
+        partsUsed: formData.partsUsed || ''
       };
 
-      // Upsert (insert new or update if exists)
-      const { data, error } = await supabase
-        .from('jobs')
-        .upsert(payload, { onConflict: 'id' })
-        .select('*')
-        .single();
+      await onSave(jobData);
 
-      if (error) {
-        console.error('Save job error:', error);
-        throw new Error(error.message || 'Failed to save job');
-      }
-
-      // Upload files (if any)
       if (formData.files.length > 0) {
         await uploadFiles(jobId, formData.files);
       }
@@ -169,17 +154,12 @@ const JobSheet: React.FC<JobSheetProps> = ({
       if (formData.purchaseOrder) {
         await uploadPurchaseOrder(jobId, formData.purchaseOrder);
       }
-
-      toast({ title: 'Saved', description: job ? 'Job updated' : 'Job created' });
-
-      // Bubble the saved row to parent (keeps UI/list in sync)
-      onSave(data as Job);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to save job:', error);
       toast({
         title: 'Error',
-        description: error?.message || 'Failed to save job. Please try again.',
-        variant: 'destructive',
+        description: 'Failed to save job. Please try again.',
+        variant: 'destructive'
       });
     } finally {
       setIsSubmitting(false);
@@ -193,19 +173,28 @@ const JobSheet: React.FC<JobSheetProps> = ({
   };
 
   return (
-    <JobSheetForm
-      formData={formData}
-      setFormData={setFormData}
-      technicians={technicians}
-      customers={customers}
-      handleTechnicianToggle={handleTechnicianToggle}
-      handleFilesChange={handleFilesChange}
-      handleSubmit={handleSubmit}
-      onCancel={onCancel}
-      onDelete={handleDelete}
-      isSubmitting={isSubmitting}
-      job={job}
-    />
+    <div className="space-y-4">
+      {/* Back button */}
+      <div className="flex justify-between items-center">
+        <Button variant="outline" onClick={onCancel}>
+          ← Back
+        </Button>
+      </div>
+
+      <JobSheetForm
+        formData={formData}
+        setFormData={setFormData}
+        technicians={technicians}
+        customers={customers}
+        handleTechnicianToggle={handleTechnicianToggle}
+        handleFilesChange={handleFilesChange}
+        handleSubmit={handleSubmit}
+        onCancel={onCancel}
+        onDelete={handleDelete}
+        isSubmitting={isSubmitting}
+        job={job}
+      />
+    </div>
   );
 };
 
