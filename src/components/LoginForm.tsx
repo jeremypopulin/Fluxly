@@ -51,7 +51,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
     <div className="min-h-screen bg-[#0B1F3A] flex items-center justify-center px-4 sm:px-6 lg:px-8 py-8">
       <Card className="w-full max-w-sm sm:max-w-md shadow-lg mx-2 bg-[#0B1F3A] border-gray-600">
         <CardHeader className="text-center">
-          {/* ⚠️ Fluxly logo remains unchanged */}
+          {/* Fluxly logo (unchanged) */}
           <div className="mx-auto mb-4">
             <Logo size="2xl" className="justify-center" />
           </div>
@@ -103,14 +103,15 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
             </Button>
           </form>
 
-          {/* Footer credit with local image in /public */}
+          {/* Footer credit with non-cropping logo */}
           <div className="mt-6 text-center">
-            <div className="flex items-center justify-center space-x-2 text-sm text-gray-300">
+            <div className="flex items-center justify-center gap-2 text-sm text-gray-300">
               <span>Developed by Choccy Bear</span>
               <img
                 src="/choccy-bear.png"
                 alt="Choccy Bear Logo"
-                className="h-6 w-6 rounded-full"
+                className="h-8 sm:h-10 object-contain"
+                style={{ maxWidth: '80px' }}
               />
             </div>
           </div>
