@@ -29,16 +29,16 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
         toast({ title: 'Login successful', description: 'Welcome back!' });
         onLogin();
       } else {
-        toast({ 
-          title: 'Login failed', 
+        toast({
+          title: 'Login failed',
           description: 'Invalid credentials. Please check your email and password.',
           variant: 'destructive'
         });
       }
     } catch (error) {
       console.error('Login error:', error);
-      toast({ 
-        title: 'Login failed', 
+      toast({
+        title: 'Login failed',
         description: 'Database error. Please check your connection.',
         variant: 'destructive'
       });
@@ -51,6 +51,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
     <div className="min-h-screen bg-[#0B1F3A] flex items-center justify-center px-4 sm:px-6 lg:px-8 py-8">
       <Card className="w-full max-w-sm sm:max-w-md shadow-lg mx-2 bg-[#0B1F3A] border-gray-600">
         <CardHeader className="text-center">
+          {/* ⚠️ Fluxly logo remains unchanged */}
           <div className="mx-auto mb-4">
             <Logo size="2xl" className="justify-center" />
           </div>
@@ -58,6 +59,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
             Sign in to manage your team's schedule
           </CardDescription>
         </CardHeader>
+
         <CardContent className="px-4 sm:px-6">
           <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-4">
             <div className="space-y-2">
@@ -75,6 +77,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
                 />
               </div>
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="password" className="text-gray-200">Password</Label>
               <div className="relative">
@@ -90,16 +93,23 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
                 />
               </div>
             </div>
-            <Button type="submit" className="w-full py-3 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white" disabled={loading}>
+
+            <Button
+              type="submit"
+              className="w-full py-3 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={loading}
+            >
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
+
+          {/* Footer credit with local image in /public */}
           <div className="mt-6 text-center">
             <div className="flex items-center justify-center space-x-2 text-sm text-gray-300">
               <span>Developed by Choccy Bear</span>
-              <img 
-                src="https://d64gsuwffb70l.cloudfront.net/6873a1e457bd1eaf39f2254b_1752666762002_ad8e025e.png" 
-                alt="Choccy Bear Logo" 
+              <img
+                src="/choccy-bear.png"
+                alt="Choccy Bear Logo"
                 className="h-6 w-6 rounded-full"
               />
             </div>
