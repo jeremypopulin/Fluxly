@@ -56,6 +56,10 @@ const JobSheetForm: React.FC<JobSheetFormProps> = ({
     setFormData((prev: any) => ({ ...prev, status: 'completed' }));
   };
 
+  const handleFlagToggle = (name: 'quotedWorks' | 'serviceCall' | 'dAndC', value: boolean | 'indeterminate') => {
+    setFormData((prev: any) => ({ ...prev, [name]: !!value }));
+  };
+
   // File handlers for UI below
   const onPhotosChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -90,7 +94,7 @@ const JobSheetForm: React.FC<JobSheetFormProps> = ({
             </div>
           </div>
 
-          {/* Customer + Quote Number */}
+          {/* Customer + Quote Number (smaller) + Flags inline */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             <div>
               <Label>Customer</Label>
@@ -108,9 +112,40 @@ const JobSheetForm: React.FC<JobSheetFormProps> = ({
                 ))}
               </select>
             </div>
+
+            {/* Right side: small Quote field + 3 tick boxes beside it */}
             <div>
-              <Label>Quote Number</Label>
-              <Input name="quoteNumber" value={formData.quoteNumber} onChange={handleInputChange} />
+              <Label>Quote / Type</Label>
+              <div className="mt-2 flex flex-wrap items-center gap-4">
+                <Input
+                  name="quoteNumber"
+                  value={formData.quoteNumber}
+                  onChange={handleInputChange}
+                  placeholder="Quote #"
+                  className="w-40 md:w-56"
+                />
+                <label className="inline-flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={!!formData.quotedWorks}
+                    onCheckedChange={(v) => handleFlagToggle('quotedWorks', v)}
+                  />
+                  <span>Quoted works</span>
+                </label>
+                <label className="inline-flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={!!formData.serviceCall}
+                    onCheckedChange={(v) => handleFlagToggle('serviceCall', v)}
+                  />
+                  <span>Service call</span>
+                </label>
+                <label className="inline-flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={!!formData.dAndC}
+                    onCheckedChange={(v) => handleFlagToggle('dAndC', v)}
+                  />
+                  <span>D and C</span>
+                </label>
+              </div>
             </div>
           </div>
 
