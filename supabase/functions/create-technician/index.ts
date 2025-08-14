@@ -12,6 +12,11 @@ function withCorsHeaders(body: string, status = 200) {
   });
 }
 
+// ---- Hard-coded config for quick testing ----
+const PROJECT_URL = "https://diyuewnatraebokzeatl.supabase.co";
+const SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpeXVld25hdHJhZWJva3plYXRsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzY2MTM2MiwiZXhwIjoyMDY5MjM3MzYyfQ.yhi7-48zBqQCbBoVAJnxmqT7d2SulPy5xTNxgfrkSHc";
+const TECH_CREATION_SECRET = "JosieBeePopulin2023!";
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return withCorsHeaders("ok");
 
@@ -23,22 +28,19 @@ serve(async (req) => {
       return withCorsHeaders(JSON.stringify({ error: "Missing required fields" }), 400);
     }
 
-    const expectedSecret = Deno.env.get("TECH_CREATION_SECRET");
-    if (secret !== expectedSecret) {
+    if (secret !== TECH_CREATION_SECRET) {
       console.log("❌ Invalid secret");
       return withCorsHeaders(JSON.stringify({ error: "Unauthorized" }), 403);
     }
 
-    const projectUrl = Deno.env.get("PROJECT_URL")!;
-    const serviceKey = Deno.env.get("SERVICE_ROLE_KEY")!;
     let userId: string | null = null;
 
     console.log("📨 Creating user...");
-    const createRes = await fetch(`${projectUrl}/auth/v1/admin/users`, {
+    const createRes = await fetch(`${PROJECT_URL}/auth/v1/admin/users`, {
       method: "POST",
       headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
+        apikey: SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ email, password }),
@@ -58,11 +60,11 @@ serve(async (req) => {
     }
 
     console.log("📝 Inserting into profiles...");
-    const profileRes = await fetch(`${projectUrl}/rest/v1/profiles`, {
+    const profileRes = await fetch(`${PROJECT_URL}/rest/v1/profiles`, {
       method: "POST",
       headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
+        apikey: SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
         "Content-Type": "application/json",
         Prefer: "return=minimal",
       },
@@ -71,7 +73,7 @@ serve(async (req) => {
         email,
         name: full_name,
         role,
-        initials: full_name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 3),
+        initials: full_name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 3),
       }]),
     });
 

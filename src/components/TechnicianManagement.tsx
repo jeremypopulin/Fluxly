@@ -1,182 +1,185 @@
-// src/components/technicians/TechnicianManagement.tsx
-import React, { useState, useEffect } from 'react';
-import type { Technician } from '@/types';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { toast } from '@/components/ui/use-toast';
-import { TechnicianAddModal } from './TechnicianAddModal';
-import { TechnicianEditModal } from './TechnicianEditModal';
-import { invokeEdge } from '@/lib/supabase';
+// src/components/TechnicianManagement.tsx
+import React, { useEffect, useMemo, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
 
-// ---- Build signature (shows in UI + console to prove correct file is loaded)
-const BUILD_TAG = 'TM-guarded-v2 @ 2025-08-14';
-console.log('[TechnicianManagement] build:', BUILD_TAG);
+// ---- Supabase client (anon) for DB reads (RLS protects data) ----
+const SUPABASE_URL = "https://diyuewnatraebokzeatl.supabase.co";
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""; // set in your env
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Optional: prevent infinite “Loading…” if a request hangs
-const REQUEST_TIMEOUT_MS = 20000;
-function withTimeout<T>(p: Promise<T>, ms = REQUEST_TIMEOUT_MS): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error('Request timed out')), ms);
-    p.then((v) => {
-      clearTimeout(t);
-      resolve(v);
-    }).catch((e) => {
-      clearTimeout(t);
-      reject(e);
-    });
-  });
-}
+// ---- Edge Function endpoint + admin header secret for deletes ----
+const EDGE_BASE = "https://diyuewnatraebokzeatl.functions.supabase.co";
+const DELETE_FN_URL = `${EDGE_BASE}/delete-technician`;
+const ADMIN_TOKEN = "JosieBeePopulin2023!";
 
-const TechnicianManagement: React.FC = () => {
-  const [technicians, setTechnicians] = useState<Technician[]>([]);
-  const [editTechnician, setEditTechnician] = useState<Technician | null>(null);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [loading, setLoading] = useState(false);
+type Profile = {
+  id: string;               // matches auth.users.id
+  email: string | null;
+  name: string | null;
+  role: "admin" | "senior_tech" | "tech" | string;
+  initials?: string | null;
+};
+
+export default function TechnicianManagement() {
+  const [rows, setRows] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [lastError, setLastError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
+  // Load profiles
   useEffect(() => {
-    loadTechnicians();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let cancelled = false;
 
-  const loadTechnicians = async () => {
-    setLoading(true);
-    setLastError(null);
-    try {
-      // ✅ Always call Edge Function with fresh JWT (handled inside invokeEdge)
-      const { data, error } = await withTimeout(invokeEdge<any>('load-technicians', {}));
-      if (error) throw new Error(error.message || 'Failed to load technicians');
+    async function load() {
+      setLoading(true);
+      setError(null);
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, email, name, role, initials")
+        .order("name", { ascending: true });
 
-      const list: Technician[] = Array.isArray(data)
-        ? (data as Technician[])
-        : Array.isArray((data as any)?.technicians)
-        ? ((data as any).technicians as Technician[])
-        : [];
-
-      setTechnicians(list ?? []);
-      console.log('[TechnicianManagement] loaded technicians:', list.length);
-    } catch (err: any) {
-      const msg = err?.message || 'Failed to load technicians';
-      console.error('[TechnicianManagement] load error:', msg, err);
-      setTechnicians([]);
-      setLastError(msg);
-      toast({ title: 'Error', description: msg, variant: 'destructive' });
-    } finally {
+      if (cancelled) return;
+      if (error) {
+        setError(error.message);
+      } else {
+        setRows(data || []);
+      }
       setLoading(false);
     }
-  };
 
-  const handleDelete = async (userId: string) => {
-    const confirmed = window.confirm('Are you sure you want to delete this technician?');
-    if (!confirmed) return;
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter(r =>
+      (r.name || "").toLowerCase().includes(q) ||
+      (r.email || "").toLowerCase().includes(q) ||
+      (r.role || "").toLowerCase().includes(q)
+    );
+  }, [rows, search]);
+
+  async function handleDelete(userId: string, email?: string | null) {
+    const label = email || userId;
+    const ok = window.confirm(`Delete ${label}? This removes their Auth user and profile. This cannot be undone.`);
+    if (!ok) return;
 
     setDeletingId(userId);
-    setLastError(null);
+    setError(null);
+
+    // optimistic UI
+    const prev = rows;
+    setRows(cur => cur.filter(r => r.id !== userId));
+
     try {
-      const { data, error } = await withTimeout(
-        invokeEdge<any>('delete-technician', {
-          userId,
-          // NOTE: matches your current function’s shared secret usage.
-          secret: 'JosieBeePopulin2023!',
-        })
-      );
+      const res = await fetch(DELETE_FN_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-token": ADMIN_TOKEN,
+        },
+        body: JSON.stringify({ user_id: userId }),
+      });
 
-      if (error) throw new Error(error.message || 'Delete function error');
-      if ((data as any)?.error) throw new Error((data as any).error);
-
-      setTechnicians((prev) => prev.filter((t) => t.id !== userId));
-      toast({ title: 'Deleted', description: 'Technician deleted successfully' });
-    } catch (err: any) {
-      const msg = err?.message || 'Failed to delete technician';
-      console.error('[TechnicianManagement] delete error:', msg, err);
-      setLastError(msg);
-      toast({ title: 'Error', description: msg, variant: 'destructive' });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `Delete failed with status ${res.status}`);
+      }
+    } catch (e: any) {
+      // rollback optimistic update
+      setRows(prev);
+      setError(e.message || "Failed to delete user");
     } finally {
       setDeletingId(null);
     }
-  };
-
-  const handleUpdate = () => {
-    loadTechnicians();
-  };
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Technicians</h2>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground" title="Build signature">
-            {BUILD_TAG}
-          </span>
-          <Button onClick={() => setShowAddModal(true)} disabled={loading}>
-            {loading ? 'Loading…' : 'Add Technician'}
-          </Button>
-        </div>
+    <div style={{ padding: 16, maxWidth: 900, margin: "0 auto" }}>
+      <h1 style={{ marginBottom: 12 }}>Users / Technicians</h1>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+        <input
+          placeholder="Search name, email, role…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ padding: 8, flex: 1, border: "1px solid #ccc", borderRadius: 6 }}
+        />
+        <button
+          onClick={async () => {
+            setLoading(true);
+            const { data, error } = await supabase
+              .from("profiles")
+              .select("id, email, name, role, initials")
+              .order("name", { ascending: true });
+            if (error) setError(error.message);
+            else setRows(data || []);
+            setLoading(false);
+          }}
+          style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid #ccc", background: "#f8f8f8" }}
+        >
+          Refresh
+        </button>
       </div>
 
-      {lastError && !loading && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
-          <div className="font-medium">Couldn’t load technicians</div>
-          <div className="text-muted-foreground">{lastError}</div>
-          <div className="mt-2">
-            <Button variant="outline" onClick={loadTechnicians}>
-              Retry
-            </Button>
-          </div>
+      {error && (
+        <div style={{ marginBottom: 12, color: "#b00020" }}>
+          {error}
         </div>
       )}
 
-      {technicians.length === 0 && !loading && !lastError && (
-        <p className="text-sm text-muted-foreground">No technicians found.</p>
+      {loading ? (
+        <div>Loading…</div>
+      ) : filtered.length === 0 ? (
+        <div>No users found.</div>
+      ) : (
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e5e5" }}>
+              <th style={{ padding: 8 }}>Name</th>
+              <th style={{ padding: 8 }}>Email</th>
+              <th style={{ padding: 8 }}>Role</th>
+              <th style={{ padding: 8, width: 1 }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r) => (
+              <tr key={r.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                <td style={{ padding: 8 }}>
+                  <div style={{ fontWeight: 600 }}>{r.name || "—"}</div>
+                  <div style={{ fontSize: 12, color: "#666" }}>{r.id}</div>
+                </td>
+                <td style={{ padding: 8 }}>{r.email || "—"}</td>
+                <td style={{ padding: 8 }}>{r.role || "—"}</td>
+                <td style={{ padding: 8 }}>
+                  <button
+                    disabled={deletingId === r.id}
+                    onClick={() => handleDelete(r.id, r.email || r.name)}
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: 6,
+                      border: "1px solid #d33",
+                      background: deletingId === r.id ? "#f8d7da" : "#fff",
+                      color: "#b00020",
+                      cursor: deletingId === r.id ? "not-allowed" : "pointer",
+                    }}
+                    title="Delete user (Auth + profile)"
+                  >
+                    {deletingId === r.id ? "Deleting…" : "Delete"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {technicians.map((tech) => (
-          <Card key={tech.id} className="p-4 space-y-2">
-            <div>
-              <p className="font-medium">{tech.name || '(no name)'}</p>
-              <p className="text-sm text-muted-foreground">{tech.email}</p>
-              {tech.role && (
-                <p className="text-xs mt-1">
-                  Role: <span className="font-medium">{tech.role}</span>
-                </p>
-              )}
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button variant="outline" onClick={() => setEditTechnician(tech)}>
-                Edit
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => handleDelete(tech.id)}
-                disabled={deletingId === tech.id}
-              >
-                {deletingId === tech.id ? 'Deleting…' : 'Delete'}
-              </Button>
-            </div>
-          </Card>
-        ))}
-      </div>
-
-      {showAddModal && (
-        <TechnicianAddModal
-          isOpen={showAddModal}
-          onClose={() => setShowAddModal(false)}
-          onTechnicianAdded={loadTechnicians}
-        />
-      )}
-
-      {editTechnician && (
-        <TechnicianEditModal
-          isOpen={!!editTechnician}
-          technician={editTechnician}
-          onClose={() => setEditTechnician(null)}
-          onTechnicianUpdated={handleUpdate}
-        />
-      )}
+      <p style={{ marginTop: 12, fontSize: 12, color: "#666" }}>
+        Deleting a user here calls your <code>delete-technician</code> Edge Function to remove their Auth user and their profile row.
+      </p>
     </div>
   );
-};
-
-export default TechnicianManagement;
+}
