@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // src/components/TechnicianManagement.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
@@ -6,6 +7,20 @@ import { createClient } from "@supabase/supabase-js";
 const SUPABASE_URL = "https://diyuewnatraebokzeatl.supabase.co";
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""; // set in your env
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+=======
+import React, { useState, useEffect } from 'react';
+import type { Technician } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { toast } from '@/components/ui/use-toast';
+import { TechnicianAddModal } from './TechnicianAddModal';
+import { TechnicianEditModal } from './TechnicianEditModal';
+import { invokeEdge } from '@/lib/supabase';
+
+// ---- Build signature (shows in UI + console to prove correct file is loaded)
+const BUILD_TAG = 'TM-guarded-v3-envsecret @ 2025-08-14';
+console.log('[TechnicianManagement] build:', BUILD_TAG);
+>>>>>>> 8123b47 (Trigger redeploy with updated Vercel env vars)
 
 // ---- Edge Function endpoint + admin header secret for deletes ----
 const EDGE_BASE = "https://diyuewnatraebokzeatl.functions.supabase.co";
@@ -31,6 +46,7 @@ export default function TechnicianManagement() {
   useEffect(() => {
     let cancelled = false;
 
+<<<<<<< HEAD
     async function load() {
       setLoading(true);
       setError(null);
@@ -38,6 +54,14 @@ export default function TechnicianManagement() {
         .from("profiles")
         .select("id, email, name, role, initials")
         .order("name", { ascending: true });
+=======
+  const loadTechnicians = async () => {
+    setLoading(true);
+    setLastError(null);
+    try {
+      const { data, error } = await withTimeout(invokeEdge<any>('load-technicians', {}));
+      if (error) throw new Error(error.message || 'Failed to load technicians');
+>>>>>>> 8123b47 (Trigger redeploy with updated Vercel env vars)
 
       if (cancelled) return;
       if (error) {
@@ -75,6 +99,7 @@ export default function TechnicianManagement() {
     setRows(cur => cur.filter(r => r.id !== userId));
 
     try {
+<<<<<<< HEAD
       const res = await fetch(DELETE_FN_URL, {
         method: "POST",
         headers: {
@@ -83,6 +108,14 @@ export default function TechnicianManagement() {
         },
         body: JSON.stringify({ user_id: userId }),
       });
+=======
+      const { data, error } = await withTimeout(
+        invokeEdge<any>('delete-technician', {
+          userId,
+          secret: process.env.NEXT_PUBLIC_TECH_CREATION_SECRET,
+        })
+      );
+>>>>>>> 8123b47 (Trigger redeploy with updated Vercel env vars)
 
       if (!res.ok) {
         const text = await res.text();

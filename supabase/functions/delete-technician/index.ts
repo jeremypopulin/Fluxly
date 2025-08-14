@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 Deno.serve(async (req) => {
   try {
+<<<<<<< HEAD
     // --- 1) Validate admin token ---
     const adminToken = req.headers.get("x-admin-token");
     const expectedToken = Deno.env.get("ADMIN_TOKEN");
@@ -28,6 +29,32 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
+=======
+    const { userId, email, secret } = await req.json();
+
+    // 🔒 Secret check (matches create-technician style)
+    const expectedSecret = Deno.env.get("TECH_CREATION_SECRET");
+    if (!expectedSecret || secret !== expectedSecret) {
+      console.log("❌ Invalid or missing TECH_CREATION_SECRET");
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    if (!supabaseUrl || !serviceKey) {
+      console.log("❌ Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+      return new Response(
+        JSON.stringify({ error: "Server misconfigured" }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+>>>>>>> 8123b47 (Trigger redeploy with updated Vercel env vars)
 
     // --- 4) Delete from auth.users ---
     const { error: authError } = await supabase.auth.admin.deleteUser(user_id);

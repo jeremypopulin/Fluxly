@@ -5,7 +5,6 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
 
 interface TechnicianAddModalProps {
   isOpen: boolean;
@@ -35,32 +34,17 @@ export function TechnicianAddModal({ isOpen, onClose, onTechnicianAdded }: Techn
     setIsLoading(true);
 
     try {
-      const {
-        data: { session },
-        error: sessionError
-      } = await supabase.auth.getSession();
-
-      if (!session || sessionError) {
-        toast({
-          title: 'Error',
-          description: 'You must be logged in to add a technician',
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      const res = await fetch("https://diyuewnatraebokzeatl.supabase.co/functions/v1/create-technician", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-technician`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}` // ✅ required for secure access
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
           full_name: formData.name,
           role: formData.role.toLowerCase(),
-          secret: "JosieBeePopulin2023!" // ✅ shared secret for internal auth
+          secret: process.env.NEXT_PUBLIC_TECH_CREATION_SECRET
         })
       });
 
